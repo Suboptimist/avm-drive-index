@@ -1,0 +1,11 @@
+AVM Drive Index
+
+1. Drag “AVM Drive Index.app” to the Applications shortcut.
+2. Open the app from Applications.
+3. Click “Turn On” once to start automatic drive indexing.
+
+Your private catalogue is kept in:
+~/Library/Application Support/AVM Drive Index
+
+Note: To distribute this app without macOS security prompts, it must be
+signed with a Developer ID certificate and notarized by Apple.

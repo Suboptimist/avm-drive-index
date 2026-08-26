@@ -522,6 +522,146 @@ function Get-CardVolume {
 
 # ---------------------------------------------------------------- copying
 
+function New-CopyNode([string]$Id, [string]$Name, [bool]$IsFile, [long]$Size) {
+    return [pscustomobject]@{
+        Id = $Id; Name = $Name; IsFile = $IsFile; Size = $Size
+        Children = (New-Object System.Collections.Generic.List[object])
+    }
+}
+
+function Get-CopyTree([string]$Root, [int]$MaxDepth = 8, [int]$MaxFiles = 20000) {
+    # The browsable tree for the copy picker: folders you can open and tick,
+    # with the files inside them.
+    $top = New-CopyNode '' '' $false 0
+    $index = @{ '' = $top }
+
+    function Get-CopyFolderNode([string]$RelPath) {
+        if ($index.ContainsKey($RelPath)) { return $index[$RelPath] }
+        $parentRel = ''
+        $name = $RelPath
+        $slash = $RelPath.LastIndexOf('\')
+        if ($slash -ge 0) {
+            $parentRel = $RelPath.Substring(0, $slash)
+            $name = $RelPath.Substring($slash + 1)
+        }
+        $parent = Get-CopyFolderNode $parentRel
+        $node = New-CopyNode $RelPath $name $false 0
+        $parent.Children.Add($node) | Out-Null
+        $index[$RelPath] = $node
+        return $node
+    }
+
+    if (-not (Test-Path -LiteralPath $Root)) { return $top }
+    $prefixLength = $Root.TrimEnd('\', '/').Length + 1
+    $count = 0
+    foreach ($item in (Get-ChildItem -LiteralPath $Root -Recurse -Depth ($MaxDepth - 1) -ErrorAction SilentlyContinue)) {
+        if ($count -ge $MaxFiles) { break }
+        if ($item.FullName.Length -le $prefixLength) { continue }
+        $rel = $item.FullName.Substring($prefixLength).Replace('/', '\')
+        if ([string]::IsNullOrWhiteSpace($rel)) { continue }
+        if ($item.PSIsContainer) { Get-CopyFolderNode $rel | Out-Null; continue }
+        $parentRel = ''
+        $name = $rel
+        $slash = $rel.LastIndexOf('\')
+        if ($slash -ge 0) {
+            $parentRel = $rel.Substring(0, $slash)
+            $name = $rel.Substring($slash + 1)
+        }
+        $parent = Get-CopyFolderNode $parentRel
+        $parent.Children.Add((New-CopyNode $item.FullName $name $true $item.Length)) | Out-Null
+        $count++
+    }
+    Sort-CopyNode $top
+    return $top
+}
+
+function Sort-CopyNode($Node) {
+    if ($Node.Children.Count -eq 0) { return }
+    $sorted = @($Node.Children | Sort-Object @{ Expression = { $_.IsFile } }, @{ Expression = { $_.Name } })
+    $Node.Children.Clear()
+    foreach ($child in $sorted) { $Node.Children.Add($child) | Out-Null; Sort-CopyNode $child }
+}
+
+function Get-CopyNodeFiles($Node) {
+    $out = New-Object System.Collections.ArrayList
+    if ($Node.IsFile) { [void]$out.Add($Node); return $out.ToArray() }
+    foreach ($child in $Node.Children) {
+        foreach ($file in (Get-CopyNodeFiles $child)) { [void]$out.Add($file) }
+    }
+    return $out.ToArray()
+}
+
+function Get-CopyTickState($Node, $Selected) {
+    $all = @(Get-CopyNodeFiles $Node)
+    if ($all.Count -eq 0) { return 'none' }
+    $chosen = 0
+    foreach ($file in $all) { if ($Selected.Contains($file.Id)) { $chosen++ } }
+    if ($chosen -eq 0) { return 'none' }
+    if ($chosen -eq $all.Count) { return 'all' }
+    return 'some'
+}
+
+function Set-CopyTick($Node, $Selected) {
+    # Ticking a folder takes everything in it; ticking again clears it.
+    $state = Get-CopyTickState $Node $Selected
+    foreach ($file in (Get-CopyNodeFiles $Node)) {
+        if ($state -eq 'all') { [void]$Selected.Remove($file.Id) }
+        else { [void]$Selected.Add($file.Id) }
+    }
+}
+
+function Get-CopyItems($Nodes, $Selected) {
+    # A file ticked on its own lands straight in the chosen folder. Tick a whole
+    # folder and that folder is recreated at the destination, contents inside.
+    $out = New-Object System.Collections.ArrayList
+
+    function Walk-CopyNode($Node, $Prefix) {
+        if ($Node.IsFile) {
+            if (-not $Selected.Contains($Node.Id)) { return }
+            $rel = $Node.Name
+            if ($Prefix) { $rel = "$Prefix\$($Node.Name)" }
+            [void]$out.Add([pscustomobject]@{ Source = $Node.Id; RelativePath = $rel; Size = $Node.Size })
+            return
+        }
+        if (-not $Prefix -and (Get-CopyTickState $Node $Selected) -eq 'all') {
+            foreach ($child in $Node.Children) { Walk-CopyNode $child $Node.Name }
+        } elseif ($Prefix) {
+            foreach ($child in $Node.Children) { Walk-CopyNode $child "$Prefix\$($Node.Name)" }
+        } else {
+            foreach ($child in $Node.Children) { Walk-CopyNode $child $null }
+        }
+    }
+
+    foreach ($node in $Nodes) { Walk-CopyNode $node $null }
+    return $out.ToArray()
+}
+
+function Copy-OneItem($Item, [string]$DestinationFolder) {
+    # Same rules as Copy-OneFile, but honouring the item's relative path.
+    if (-not (Test-Path -LiteralPath $Item.Source -PathType Leaf)) {
+        return [pscustomobject]@{ Status = 'failed'; Bytes = 0; Error = 'the file is no longer there' }
+    }
+    $target = Join-Path $DestinationFolder $Item.RelativePath
+    if (Test-Path -LiteralPath $target) {
+        return [pscustomobject]@{ Status = 'skipped'; Bytes = 0; Error = '' }
+    }
+    $parent = Split-Path $target -Parent
+    if (-not (Test-Path -LiteralPath $parent)) {
+        try { New-Item -ItemType Directory -Path $parent -Force -ErrorAction Stop | Out-Null }
+        catch { return [pscustomobject]@{ Status = 'failed'; Bytes = 0; Error = $_.Exception.Message } }
+    }
+    $expected = (Get-Item -LiteralPath $Item.Source).Length
+    try { Copy-Item -LiteralPath $Item.Source -Destination $target -ErrorAction Stop }
+    catch { return [pscustomobject]@{ Status = 'failed'; Bytes = 0; Error = $_.Exception.Message } }
+    $written = 0
+    try { $written = (Get-Item -LiteralPath $target).Length } catch { }
+    if ($written -ne $expected) {
+        Remove-Item -LiteralPath $target -Force -ErrorAction SilentlyContinue
+        return [pscustomobject]@{ Status = 'failed'; Bytes = 0; Error = "copied $written of $expected bytes" }
+    }
+    return [pscustomobject]@{ Status = 'copied'; Bytes = $expected; Error = '' }
+}
+
 function Copy-OneFile([string]$SourcePath, [string]$DestinationFolder) {
     # Never removes anything from the source, never overwrites anything at the
     # destination, and never leaves a short copy behind.

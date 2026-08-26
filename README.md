@@ -52,7 +52,16 @@ fresh.
 
 ![Choosing files to copy from a card](screenshots/05-copy.png)
 
-**Copy Files…** lets you pick files and a destination folder on another drive.
+**Copy Files…** sits at the top for a card, and in the right-click menu for an
+ordinary drive (copying off a drive is the rarer job).
+
+You browse the card as a folder tree: open a folder to tick individual files,
+or tick the folder itself to take everything in it. What you tick decides where
+things land — **a file ticked on its own goes straight into the folder you
+chose, and a folder you tick is recreated at the destination with its contents
+inside**. So ticking `100MSDCF` puts a `100MSDCF` folder in your project, while
+ticking three clips inside it drops just those three clips in.
+
 It is deliberately careful with footage:
 
 - nothing is ever removed from the card,

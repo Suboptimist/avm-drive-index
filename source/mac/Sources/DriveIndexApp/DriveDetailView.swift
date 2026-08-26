@@ -67,10 +67,14 @@ struct DriveDetailView: View {
                             NSWorkspace.shared.open(volume)
                         }
                         .buttonStyle(PipButtonStyle())
-                        Button("Copy Files…") { showingCopy = true }
-                            .buttonStyle(PipButtonStyle())
-                            .help("Copy chosen files from here onto another drive")
-                        if !drive.isCard {
+                        // Copying is what a card is for, so it stays up here.
+                        // On a drive it is a rarer job and lives in the
+                        // right-click menu instead.
+                        if drive.isCard {
+                            Button("Copy Files…") { showingCopy = true }
+                                .buttonStyle(PipButtonStyle())
+                                .help("Copy chosen files from this card onto a drive")
+                        } else {
                             Button("New Project") { showingNewProject = true }
                                 .buttonStyle(PipButtonStyle())
                                 .help("Create the standard project folder structure on this drive")

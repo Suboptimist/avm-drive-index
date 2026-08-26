@@ -74,9 +74,11 @@ it's plain folders and text files, so nothing is locked inside the app.
 - **Search** (or press **Ctrl+F**) — searches the *entire* index: drive names,
   folder names, and file names across every drive ever connected. Click a
   result to jump to its drive; press Esc to clear.
-- **Copy Files…** — pick files from a card (or any connected drive) and copy
-  them into a folder on another drive. Windows' own file picker is used, so
-  multi-select, previews and type filtering all work as you expect. Nothing is
+- **Copy Files…** — browse a card as a folder tree and tick whole folders or
+  individual files, then copy them into a folder on another drive. A file
+  ticked on its own lands straight in the chosen folder; a folder you tick is
+  recreated at the destination with its contents inside. The button is at the
+  top for a card and in the right-click menu for an ordinary drive. Nothing is
   removed from the source, files already at the destination are skipped rather
   than overwritten, and every copy's size is checked.
 - **New Project** — creates the standard project folder layout on the drive

@@ -363,6 +363,14 @@ $script:Records       = @()
 $script:Cards         = @()
 $script:CopyState     = $null
 $script:CopyTimer     = $null
+$script:CopySelection = $null
+$script:CopyBoxes     = $null
+$script:CopyRoots     = @()
+$script:CopyRecord    = $null
+$script:CopyDestination = $null
+$script:CopyDestText  = $null
+$script:CopyCountText = $null
+$script:CopyPickerWindow = $null
 $script:Org           = Get-Organization
 $script:SelectedName  = $null
 $script:ActiveTab     = 'contents'
@@ -622,6 +630,7 @@ function New-DriveContextMenu($Record) {
     }
 
     if ($Record.IsConnected) {
+        $menu.Items.Add((New-MenuItem 'Copy Files...' $driveName { Copy-FilesFromVolume $this.Tag })) | Out-Null
         $menu.Items.Add((New-MenuItem 'Eject' $driveName { Invoke-Eject $this.Tag })) | Out-Null
         $menu.Items.Add((New-Object System.Windows.Controls.Separator)) | Out-Null
     }
@@ -759,10 +768,16 @@ function Show-Detail {
         $script:DetailStatus.Text = 'Connected'
         $script:DetailStatus.Foreground = $script:BrushGreen
         $script:OpenDriveButton.Visibility = 'Visible'
-        $script:CopyFilesButton.Visibility = 'Visible'
         $script:EjectButton.Visibility = 'Visible'
-        if ($record.IsCard) { $script:NewProjectButton.Visibility = 'Collapsed' }
-        else { $script:NewProjectButton.Visibility = 'Visible' }
+        # Copying is what a card is for, so it stays up here. On a drive it is
+        # a rarer job and lives in the right-click menu instead.
+        if ($record.IsCard) {
+            $script:CopyFilesButton.Visibility = 'Visible'
+            $script:NewProjectButton.Visibility = 'Collapsed'
+        } else {
+            $script:CopyFilesButton.Visibility = 'Collapsed'
+            $script:NewProjectButton.Visibility = 'Visible'
+        }
     } else {
         $script:DetailIndicator.Background = $script:BrushGrey
         $script:DetailDot.Visibility = 'Collapsed'
@@ -1306,43 +1321,274 @@ function Copy-FilesFromVolume([string]$Name) {
     if ($Name) { $record = Get-RecordByName $Name } else { $record = Get-SelectedRecord }
     if (-not $record -or -not $record.VolumePath) { return }
 
-    # Which files. The standard Windows picker is used on purpose: it already
-    # does multi-select, previews and type filtering far better than a list
-    # built by hand here.
-    $dialog = New-Object Microsoft.Win32.OpenFileDialog
-    $dialog.Multiselect = $true
-    $dialog.Title = "Choose files to copy from $($record.IndexFolderName)"
-    $start = $record.VolumePath
-    $dcim = Join-Path $record.VolumePath 'DCIM'
-    if (Test-Path -LiteralPath $dcim) { $start = $dcim }
-    $dialog.InitialDirectory = $start
-    if ($dialog.ShowDialog() -ne $true) { return }
-    $files = @($dialog.FileNames)
-    if ($files.Count -eq 0) { return }
+    try {
+        Show-CopyPicker $record
+    } catch {
+        # If the picker cannot be built for any reason, fall back to Windows'
+        # own file dialog so copying still works.
+        [System.Windows.MessageBox]::Show(
+            "The file browser could not be shown, so Windows' file picker will be used instead.`r`n`r`n$($_.Exception.Message)",
+            'Copy Files') | Out-Null
+        Copy-FilesWithNativePicker $record
+    }
+}
 
-    # Where they go. Start the picker on another drive that is plugged in.
-    $suggested = $record.VolumePath
+function Get-CopyDestination($Record) {
+    # Start the folder picker on another drive that is plugged in.
+    $suggested = $Record.VolumePath
     foreach ($other in $script:Records) {
-        if ($other.VolumePath -and $other.IndexFolderName -ne $record.IndexFolderName) {
+        if ($other.VolumePath -and $other.IndexFolderName -ne $Record.IndexFolderName) {
             $suggested = $other.VolumePath; break
         }
     }
-    $destination = $null
     try {
         $shell = New-Object -ComObject Shell.Application
         $chosen = $shell.BrowseForFolder(0, 'Where should these files go?', 0, $suggested)
-        if (-not $chosen) { return }
-        $destination = $chosen.Self.Path
+        if (-not $chosen) { return $null }
+        return $chosen.Self.Path
     } catch {
         [System.Windows.MessageBox]::Show(
             "A folder could not be chosen.`r`n`r`n$($_.Exception.Message)", 'Copy Files') | Out-Null
-        return
+        return $null
     }
-    if (-not $destination) { return }
-    Start-CopyJob $files $destination $record.IndexFolderName
 }
 
-function Start-CopyJob($Files, [string]$Destination, [string]$SourceName) {
+function Show-CopyPicker($Record) {
+    # A tree of the volume's folders and files. Tick a whole folder or open it
+    # and tick single files.
+    $tree = Get-CopyTree $Record.VolumePath
+    if ($tree.Children.Count -eq 0) {
+        [System.Windows.MessageBox]::Show(
+            "No readable files were found on $($Record.IndexFolderName).", 'Copy Files') | Out-Null
+        return
+    }
+    $script:CopySelection = New-Object System.Collections.Generic.HashSet[string]
+    $script:CopyBoxes = New-Object System.Collections.ArrayList
+    $script:CopyRoots = $tree.Children
+    $script:CopyDestination = $null
+
+    $picker = New-Object System.Windows.Window
+    $picker.Title = "Copy from $($Record.IndexFolderName)"
+    $picker.Width = 640
+    $picker.Height = 560
+    $picker.WindowStartupLocation = 'CenterOwner'
+    try { $picker.Owner = $window } catch { }
+    $picker.Background = $script:BrushRaised
+
+    $layout = New-Object System.Windows.Controls.Grid
+    $layout.Margin = '18'
+    foreach ($h in @('Auto', 'Auto', '*', 'Auto', 'Auto')) {
+        $row = New-Object System.Windows.Controls.RowDefinition
+        $row.Height = $h
+        $layout.RowDefinitions.Add($row)
+    }
+
+    $title = New-Text "Copy from $($Record.IndexFolderName)" 15 $script:BrushText 'Bold' 'Consolas'
+    [System.Windows.Controls.Grid]::SetRow($title, 0)
+    $layout.Children.Add($title) | Out-Null
+
+    $tools = New-Object System.Windows.Controls.StackPanel
+    $tools.Orientation = 'Horizontal'
+    $tools.Margin = '0,10,0,8'
+    $selectAll = New-Object System.Windows.Controls.Button
+    $selectAll.Content = 'Select all'
+    try { $selectAll.Style = $window.FindResource('PipButton') } catch { }
+    $selectAll.add_Click({
+        foreach ($node in $script:CopyRoots) {
+            foreach ($file in (Get-CopyNodeFiles $node)) { [void]$script:CopySelection.Add($file.Id) }
+        }
+        Update-CopyBoxes
+    })
+    $none = New-Object System.Windows.Controls.Button
+    $none.Content = 'None'
+    $none.Margin = '8,0,0,0'
+    try { $none.Style = $window.FindResource('PipButton') } catch { }
+    $none.add_Click({ $script:CopySelection.Clear(); Update-CopyBoxes })
+    $tools.Children.Add($selectAll) | Out-Null
+    $tools.Children.Add($none) | Out-Null
+    [System.Windows.Controls.Grid]::SetRow($tools, 1)
+    $layout.Children.Add($tools) | Out-Null
+
+    $treeView = New-Object System.Windows.Controls.TreeView
+    $treeView.Background = $script:BrushClear
+    $treeView.BorderThickness = 1
+    $treeView.BorderBrush = $script:BrushFaint
+    foreach ($node in $tree.Children) {
+        $treeView.Items.Add((New-CopyTreeItem $node)) | Out-Null
+    }
+    [System.Windows.Controls.Grid]::SetRow($treeView, 2)
+    $layout.Children.Add($treeView) | Out-Null
+
+    $destPanel = New-Object System.Windows.Controls.StackPanel
+    $destPanel.Margin = '0,12,0,0'
+    $destPanel.Children.Add((New-Text 'Copy into' 11 $script:BrushDim)) | Out-Null
+    $destRow = New-Object System.Windows.Controls.Grid
+    $destRow.Margin = '0,4,0,0'
+    foreach ($w in @('*', 'Auto')) {
+        $col = New-Object System.Windows.Controls.ColumnDefinition
+        $col.Width = $w
+        $destRow.ColumnDefinitions.Add($col)
+    }
+    $script:CopyDestText = New-Text 'Choose a folder on another drive...' 11.5 $script:BrushDim 'Normal' 'Consolas'
+    [System.Windows.Controls.Grid]::SetColumn($script:CopyDestText, 0)
+    $destRow.Children.Add($script:CopyDestText) | Out-Null
+    $choose = New-Object System.Windows.Controls.Button
+    $choose.Content = 'Choose...'
+    try { $choose.Style = $window.FindResource('PipButton') } catch { }
+    $choose.add_Click({
+        $picked = Get-CopyDestination $script:CopyRecord
+        if ($picked) {
+            $script:CopyDestination = $picked
+            $script:CopyDestText.Text = $picked
+            $script:CopyDestText.Foreground = $script:BrushText
+        }
+    })
+    [System.Windows.Controls.Grid]::SetColumn($choose, 1)
+    $destRow.Children.Add($choose) | Out-Null
+    $destPanel.Children.Add($destRow) | Out-Null
+    [System.Windows.Controls.Grid]::SetRow($destPanel, 3)
+    $layout.Children.Add($destPanel) | Out-Null
+
+    $footer = New-Object System.Windows.Controls.Grid
+    $footer.Margin = '0,14,0,0'
+    foreach ($w in @('*', 'Auto')) {
+        $col = New-Object System.Windows.Controls.ColumnDefinition
+        $col.Width = $w
+        $footer.ColumnDefinitions.Add($col)
+    }
+    $script:CopyCountText = New-Text 'Nothing selected' 11 $script:BrushDim 'Normal' 'Consolas'
+    [System.Windows.Controls.Grid]::SetColumn($script:CopyCountText, 0)
+    $footer.Children.Add($script:CopyCountText) | Out-Null
+    $buttons = New-Object System.Windows.Controls.StackPanel
+    $buttons.Orientation = 'Horizontal'
+    $cancel = New-Object System.Windows.Controls.Button
+    $cancel.Content = 'Cancel'
+    try { $cancel.Style = $window.FindResource('PipButton') } catch { }
+    $cancel.add_Click({ $script:CopyPickerWindow.Close() })
+    $copy = New-Object System.Windows.Controls.Button
+    $copy.Content = 'Copy'
+    $copy.Margin = '8,0,0,0'
+    try { $copy.Style = $window.FindResource('PipButton') } catch { }
+    $copy.add_Click({
+        if (-not $script:CopyDestination) {
+            [System.Windows.MessageBox]::Show('Choose a folder to copy into first.', 'Copy Files') | Out-Null
+            return
+        }
+        $items = @(Get-CopyItems $script:CopyRoots $script:CopySelection)
+        if ($items.Count -eq 0) {
+            [System.Windows.MessageBox]::Show('Nothing is selected.', 'Copy Files') | Out-Null
+            return
+        }
+        $destination = $script:CopyDestination
+        $sourceName = $script:CopyRecord.IndexFolderName
+        $script:CopyPickerWindow.Close()
+        Start-CopyJob $items $destination $sourceName
+    })
+    $buttons.Children.Add($cancel) | Out-Null
+    $buttons.Children.Add($copy) | Out-Null
+    [System.Windows.Controls.Grid]::SetColumn($buttons, 1)
+    $footer.Children.Add($buttons) | Out-Null
+    [System.Windows.Controls.Grid]::SetRow($footer, 4)
+    $layout.Children.Add($footer) | Out-Null
+
+    $picker.Content = $layout
+    $script:CopyPickerWindow = $picker
+    $script:CopyRecord = $Record
+    Update-CopyBoxes
+    $picker.ShowDialog() | Out-Null
+    $script:CopyBoxes = $null
+    $script:CopyPickerWindow = $null
+}
+
+function New-CopyTreeItem($Node) {
+    $item = New-Object System.Windows.Controls.TreeViewItem
+    $item.Tag = $Node
+
+    $row = New-Object System.Windows.Controls.StackPanel
+    $row.Orientation = 'Horizontal'
+    $box = New-Object System.Windows.Controls.CheckBox
+    $box.IsThreeState = $true
+    $box.VerticalAlignment = 'Center'
+    $box.Margin = '0,0,7,0'
+    $box.Tag = $Node
+    # Click, not Checked: setting IsChecked in code must not loop back here.
+    $box.add_Click({
+        Set-CopyTick $this.Tag $script:CopySelection
+        Update-CopyBoxes
+    })
+    $row.Children.Add($box) | Out-Null
+
+    $label = New-Text $Node.Name 12 $script:BrushText 'Normal' 'Consolas'
+    if ($Node.IsFile) { $label.Foreground = $script:BrushFileText }
+    $row.Children.Add($label) | Out-Null
+
+    $detail = if ($Node.IsFile) { Format-DriveSize $Node.Size }
+              else { "$((Get-CopyNodeFiles $Node).Count) files" }
+    $note = New-Text $detail 10.5 $script:BrushDim 'Normal' 'Consolas'
+    $note.Margin = '12,0,0,0'
+    $row.Children.Add($note) | Out-Null
+
+    $item.Header = $row
+    [void]$script:CopyBoxes.Add([pscustomobject]@{ Node = $Node; Box = $box })
+
+    if (-not $Node.IsFile -and $Node.Children.Count -gt 0) {
+        $item.Items.Add('...') | Out-Null      # filled in when opened
+        $item.add_Expanded({ Expand-CopyTreeItem $this })
+    }
+    return $item
+}
+
+function Expand-CopyTreeItem($Item) {
+    if ($Item.Items.Count -eq 1 -and $Item.Items[0] -is [string]) {
+        $Item.Items.Clear()
+        foreach ($child in $Item.Tag.Children) {
+            $Item.Items.Add((New-CopyTreeItem $child)) | Out-Null
+        }
+        Update-CopyBoxes
+    }
+}
+
+function Update-CopyBoxes {
+    if (-not $script:CopyBoxes) { return }
+    foreach ($entry in $script:CopyBoxes) {
+        $state = Get-CopyTickState $entry.Node $script:CopySelection
+        if ($state -eq 'all') { $entry.Box.IsChecked = $true }
+        elseif ($state -eq 'none') { $entry.Box.IsChecked = $false }
+        else { $entry.Box.IsChecked = $null }
+    }
+    if ($script:CopyCountText) {
+        $items = @(Get-CopyItems $script:CopyRoots $script:CopySelection)
+        $bytes = 0
+        foreach ($item in $items) { $bytes += $item.Size }
+        if ($items.Count -eq 0) { $script:CopyCountText.Text = 'Nothing selected' }
+        else { $script:CopyCountText.Text = "$($items.Count) selected  |  $(Format-DriveSize $bytes)" }
+    }
+}
+
+function Copy-FilesWithNativePicker($Record) {
+    $dialog = New-Object Microsoft.Win32.OpenFileDialog
+    $dialog.Multiselect = $true
+    $dialog.Title = "Choose files to copy from $($Record.IndexFolderName)"
+    $start = $Record.VolumePath
+    $dcim = Join-Path $Record.VolumePath 'DCIM'
+    if (Test-Path -LiteralPath $dcim) { $start = $dcim }
+    $dialog.InitialDirectory = $start
+    if ($dialog.ShowDialog() -ne $true) { return }
+    $chosen = @($dialog.FileNames)
+    if ($chosen.Count -eq 0) { return }
+    $destination = Get-CopyDestination $Record
+    if (-not $destination) { return }
+    $items = New-Object System.Collections.ArrayList
+    foreach ($path in $chosen) {
+        $size = 0
+        try { $size = (Get-Item -LiteralPath $path).Length } catch { }
+        [void]$items.Add([pscustomobject]@{
+            Source = $path; RelativePath = (Split-Path $path -Leaf); Size = $size })
+    }
+    Start-CopyJob $items.ToArray() $destination $Record.IndexFolderName
+}
+
+function Start-CopyJob($Items, [string]$Destination, [string]$SourceName) {
     # Files are copied one per timer tick rather than in a tight loop, so the
     # window keeps painting and Stop stays responsive.
     $progress = New-Object System.Windows.Window
@@ -1363,7 +1609,7 @@ function Start-CopyJob($Files, [string]$Destination, [string]$SourceName) {
     $bar = New-Object System.Windows.Controls.ProgressBar
     $bar.Height = 8
     $bar.Minimum = 0
-    $bar.Maximum = $Files.Count
+    $bar.Maximum = $Items.Count
     $bar.Foreground = $script:BrushGreen
     $bar.Background = $script:BrushFaint
     $panel.Children.Add($bar) | Out-Null
@@ -1377,7 +1623,7 @@ function Start-CopyJob($Files, [string]$Destination, [string]$SourceName) {
     $progress.Content = $panel
 
     $script:CopyState = [pscustomobject]@{
-        Files = $Files; Destination = $Destination; SourceName = $SourceName
+        Items = $Items; Destination = $Destination; SourceName = $SourceName
         Index = 0; Copied = 0; Skipped = 0
         Failed = (New-Object System.Collections.ArrayList)
         Bar = $bar; Status = $status; Window = $progress; Cancelled = $false
@@ -1392,18 +1638,18 @@ function Start-CopyJob($Files, [string]$Destination, [string]$SourceName) {
 function Step-CopyJob {
     $state = $script:CopyState
     if (-not $state) { $script:CopyTimer.Stop(); return }
-    if ($state.Cancelled -or $state.Index -ge $state.Files.Count) {
+    if ($state.Cancelled -or $state.Index -ge $state.Items.Count) {
         $script:CopyTimer.Stop()
         Complete-CopyJob
         return
     }
-    $path = $state.Files[$state.Index]
+    $item = $state.Items[$state.Index]
     $state.Index = $state.Index + 1
-    $name = [System.IO.Path]::GetFileName($path)
-    $state.Status.Text = "$name   ($($state.Index) of $($state.Files.Count))"
+    $name = $item.RelativePath
+    $state.Status.Text = "$name   ($($state.Index) of $($state.Items.Count))"
     $state.Bar.Value = $state.Index
 
-    $result = Copy-OneFile $path $state.Destination
+    $result = Copy-OneItem $item $state.Destination
     if ($result.Status -eq 'copied') { $state.Copied = $state.Copied + 1 }
     elseif ($result.Status -eq 'skipped') { $state.Skipped = $state.Skipped + 1 }
     else { [void]$state.Failed.Add("$name -- $($result.Error)") }

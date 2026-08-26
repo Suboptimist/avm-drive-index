@@ -13,6 +13,7 @@ struct ContentView: View {
     @State private var moveAfterCreate: DriveRecord?
     @State private var renameTarget: DriveGroup?
     @State private var renameName = ""
+    @State private var copyTarget: DriveRecord?
 
     var body: some View {
         ZStack {
@@ -46,6 +47,12 @@ struct ContentView: View {
         }
         .onAppear {
             if selection == nil { selection = store.drives.first?.id }
+        }
+        .sheet(item: $copyTarget) { record in
+            CopyFilesSheet(volumeName: record.indexFolderName,
+                           files: store.sourceFiles(for: record),
+                           suggestedDestination: destinationSuggestion(excluding: record))
+                .environmentObject(store)
         }
         .modifier(DialogsModifier(
             selection: $selection,
@@ -145,6 +152,12 @@ struct ContentView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
+    /// Somewhere sensible to start the destination picker: another drive that
+    /// is plugged in, rather than the volume being copied from.
+    private func destinationSuggestion(excluding record: DriveRecord) -> URL? {
+        store.drives.first { $0.id != record.id && $0.volumeURL != nil }?.volumeURL
+    }
+
     // MARK: - Search
 
     private var searchHits: [SearchHit] {
@@ -200,6 +213,19 @@ struct ContentView: View {
                         PipDriveRow(drive: card, selected: selection == card.id)
                             .contentShape(Rectangle())
                             .onTapGesture { selection = card.id }
+                            .contextMenu {
+                                Button {
+                                    copyTarget = card
+                                } label: {
+                                    Label("Copy Files…", systemImage: "doc.on.doc")
+                                }
+                                Button {
+                                    store.eject(card)
+                                } label: {
+                                    Label("Eject", systemImage: "eject.fill")
+                                }
+                                .disabled(store.ejectingID != nil)
+                            }
                             .listRowSeparator(.hidden)
                             .listRowInsets(EdgeInsets(top: 2, leading: 8, bottom: 2, trailing: 8))
                     }
@@ -245,6 +271,11 @@ struct ContentView: View {
     @ViewBuilder
     private func rowMenu(_ drive: DriveRecord) -> some View {
         if drive.isConnected {
+            Button {
+                copyTarget = drive
+            } label: {
+                Label("Copy Files…", systemImage: "doc.on.doc")
+            }
             Button {
                 store.eject(drive)
             } label: {

@@ -13,14 +13,25 @@ enum FileCopier {
         case failed(String)
     }
 
-    static func copyOne(_ file: SourceFile, into folder: URL) -> Outcome {
+    /// Copies one file to `folder/relativePath`, making any folders the path
+    /// needs along the way.
+    static func copy(_ item: CopyItem, into folder: URL) -> Outcome {
         let fm = FileManager.default
-        let target = folder.appendingPathComponent(file.name)
+        let target = folder.appendingPathComponent(item.relativePath)
 
         if fm.fileExists(atPath: target.path) { return .skippedExists }
 
+        let parent = target.deletingLastPathComponent()
+        if !fm.fileExists(atPath: parent.path) {
+            do {
+                try fm.createDirectory(at: parent, withIntermediateDirectories: true)
+            } catch {
+                return .failed("could not make \(parent.lastPathComponent): \(error.localizedDescription)")
+            }
+        }
+
         do {
-            try fm.copyItem(at: file.url, to: target)
+            try fm.copyItem(at: item.source, to: target)
         } catch {
             return .failed(error.localizedDescription)
         }
@@ -28,10 +39,10 @@ enum FileCopier {
         // Check it arrived whole. A short copy means trouble, so the partial
         // file goes rather than sitting there looking valid.
         let written = (try? target.resourceValues(forKeys: [.fileSizeKey]))?.fileSize
-        if let written, Int64(written) != file.size {
+        if let written, Int64(written) != item.size {
             try? fm.removeItem(at: target)
-            return .failed("copied \(written) of \(file.size) bytes")
+            return .failed("copied \(written) of \(item.size) bytes")
         }
-        return .copied(bytes: file.size)
+        return .copied(bytes: item.size)
     }
 }

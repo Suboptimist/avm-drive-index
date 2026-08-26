@@ -31,7 +31,7 @@ final class CopyJob: ObservableObject {
 
     func cancel() { cancelRequested = true }
 
-    func start(files: [SourceFile], to folder: URL) {
+    func start(items: [CopyItem], to folder: URL) {
         guard !isRunning else { return }
         isRunning = true
         isFinished = false
@@ -41,19 +41,19 @@ final class CopyJob: ObservableObject {
         skipped = []
         failures = []
         destination = folder
-        totalCount = files.count
-        totalBytes = files.reduce(0) { $0 + $1.size }
+        totalCount = items.count
+        totalBytes = CopyPlan.totalBytes(of: items)
 
         Task.detached { [weak self] in
             // Bind once: referring to the captured `self` var from inside the
             // nested closures below is an error under Swift 6.
             guard let job = self else { return }
 
-            for file in files {
+            for file in items {
                 if await job.cancelRequested { break }
                 await MainActor.run { job.currentName = file.name }
 
-                switch FileCopier.copyOne(file, into: folder) {
+                switch FileCopier.copy(file, into: folder) {
                 case .copied(let bytes):
                     await MainActor.run {
                         job.copiedCount += 1
@@ -89,6 +89,7 @@ struct CopyFilesSheet: View {
     @StateObject private var job = CopyJob()
 
     @State private var chosen: Set<String> = []
+    @State private var nodes: [CopyNode] = []
     @State private var destination: URL?
     @State private var filter = ""
 
@@ -107,8 +108,8 @@ struct CopyFilesSheet: View {
         }
     }
 
-    private var selectedFiles: [SourceFile] { files.filter { chosen.contains($0.id) } }
-    private var selectedBytes: Int64 { selectedFiles.reduce(0) { $0 + $1.size } }
+    private var plannedItems: [CopyItem] { CopyPlan.items(in: nodes, selected: chosen) }
+    private var selectedBytes: Int64 { CopyPlan.totalBytes(of: plannedItems) }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -126,7 +127,12 @@ struct CopyFilesSheet: View {
         .padding(18)
         .frame(width: 620, height: 540)
         .background(Pip.bgRaised)
-        .onAppear { if destination == nil { destination = suggestedDestination } }
+        .onAppear {
+            if destination == nil { destination = suggestedDestination }
+            if nodes.isEmpty {
+                nodes = CopyPlan.tree(from: files, rootPath: volumeName)
+            }
+        }
     }
 
     // MARK: Choosing
@@ -150,19 +156,18 @@ struct CopyFilesSheet: View {
             if files.isEmpty {
                 PipEmpty(title: "Nothing to copy",
                          message: "No readable files were found on \(volumeName).")
+            } else if filter.trimmingCharacters(in: .whitespaces).isEmpty {
+                // Browsing: folders you can open, and tick whole or file by file.
+                List(nodes, children: \.children) { node in
+                    nodeRow(node)
+                }
+                .listStyle(.plain)
+                .scrollContentBackground(.hidden)
+                .frame(maxHeight: .infinity)
             } else {
-                List {
-                    ForEach(folders, id: \.self) { folder in
-                        Section {
-                            ForEach(visible.filter { $0.folder == folder }) { file in
-                                row(for: file)
-                            }
-                        } header: {
-                            Text(folder.isEmpty ? "Top level" : folder)
-                                .font(.system(size: 10.5, design: .monospaced))
-                                .foregroundStyle(Pip.dim)
-                        }
-                    }
+                // Filtering: a flat list of what matches.
+                List(visible) { file in
+                    fileRow(file)
                 }
                 .listStyle(.plain)
                 .scrollContentBackground(.hidden)
@@ -193,26 +198,58 @@ struct CopyFilesSheet: View {
                 Button("Cancel") { dismiss() }
                     .buttonStyle(PipButtonStyle())
                     .keyboardShortcut(.cancelAction)
-                Button("Copy") { if let destination { job.start(files: selectedFiles, to: destination) } }
+                Button("Copy") { if let destination { job.start(items: plannedItems, to: destination) } }
                     .buttonStyle(PipButtonStyle())
                     .disabled(chosen.isEmpty || destination == nil)
             }
         }
     }
 
-    private var folders: [String] {
-        var seen: [String] = []
-        for file in visible where !seen.contains(file.folder) { seen.append(file.folder) }
-        return seen
+    /// A row in the tree: a folder you can tick whole, or a single file.
+    @ViewBuilder
+    private func nodeRow(_ node: CopyNode) -> some View {
+        let state = CopyPlan.state(of: node, selected: chosen)
+        HStack(spacing: 8) {
+            Image(systemName: tickIcon(state))
+                .foregroundStyle(state == .none ? Pip.dim : Pip.green)
+            Image(systemName: node.isFile ? "doc" : "folder.fill")
+                .font(.system(size: 11))
+                .foregroundStyle(Pip.dim)
+            Text(node.name)
+                .font(.system(size: 12, design: .monospaced))
+                .foregroundStyle(node.isFile ? Pip.text.opacity(0.85) : Pip.text)
+                .lineLimit(1)
+            Spacer(minLength: 10)
+            Text(node.isFile
+                 ? Self.byteFmt.string(fromByteCount: node.size)
+                 : "\(CopyPlan.files(under: node).count) files")
+                .font(.system(size: 10.5, design: .monospaced))
+                .foregroundStyle(Pip.dim)
+        }
+        .contentShape(Rectangle())
+        .onTapGesture { CopyPlan.toggle(node, in: &chosen) }
+        .listRowSeparator(.hidden)
     }
 
-    private func row(for file: SourceFile) -> some View {
+    private func tickIcon(_ state: CopyPlan.TickState) -> String {
+        switch state {
+        case .all:  return "checkmark.square.fill"
+        case .some: return "minus.square.fill"
+        case .none: return "square"
+        }
+    }
+
+    private func fileRow(_ file: SourceFile) -> some View {
         HStack(spacing: 8) {
             Image(systemName: chosen.contains(file.id) ? "checkmark.square.fill" : "square")
                 .foregroundStyle(chosen.contains(file.id) ? Pip.green : Pip.dim)
             Text(file.name)
                 .font(.system(size: 12, design: .monospaced))
                 .foregroundStyle(Pip.text)
+                .lineLimit(1)
+            Text(file.folder)
+                .font(.system(size: 10, design: .monospaced))
+                .foregroundStyle(Pip.dim)
                 .lineLimit(1)
             Spacer(minLength: 10)
             Text(Self.byteFmt.string(fromByteCount: file.size))

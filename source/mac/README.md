@@ -66,16 +66,25 @@ catalogued (cards get reformatted too often to be worth a permanent record),
 just there for as long as it is plugged in. Its folders and files are read
 fresh each time.
 
-**Copy Files…** then lets you pick files and a destination folder on another
-drive. It is deliberately careful:
+**Copy Files…** sits at the top for a card, and in the right-click menu for an
+ordinary drive (copying off a drive is the rarer job).
+
+You browse the card as a folder tree: open a folder to tick individual files,
+or tick the folder itself to take everything in it. What you tick decides where
+things land — **a file ticked on its own goes straight into the folder you
+chose, and a folder you tick is recreated at the destination with its contents
+inside**. So ticking `100MSDCF` puts a `100MSDCF` folder in your project, while
+ticking three clips inside it drops just those three clips in.
+
+It is deliberately careful:
 
 - nothing is ever removed from the card,
 - a file already at the destination is skipped and listed, never overwritten,
 - every copy's size is checked, and a short copy is deleted rather than left
   looking valid.
 
-Files land directly in the folder you choose, so pointing it at a project's
-`02_Footage` puts them straight there.
+Point it at a project's `02_Footage` and that is exactly where the clips end
+up.
 
 ## New Project
 

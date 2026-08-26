@@ -175,6 +175,9 @@ $xamlText = @'
               <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Top">
                 <Button Name="OpenDriveButton" Content="Open Drive"
                         Style="{StaticResource PipButton}" Margin="0,0,8,0"/>
+                <Button Name="NewProjectButton" Content="New Project"
+                        Style="{StaticResource PipButton}" Margin="0,0,8,0"
+                        ToolTip="Create the standard project folder structure on this drive"/>
                 <Button Name="EjectButton" Content="Eject" Style="{StaticResource PipButton}"/>
               </StackPanel>
             </Grid>
@@ -299,7 +302,8 @@ try {
 foreach ($name in @('SidebarPanel', 'SearchInput', 'SearchPlaceholder', 'SearchShell',
     'NewFolderButton', 'RescanButton', 'PlaceholderPane', 'PlaceholderTitle', 'PlaceholderBody',
     'DetailPane', 'DetailIndicator', 'DetailName', 'DetailDot', 'DetailStatus',
-    'OpenDriveButton', 'EjectButton', 'StatSize', 'StatFree', 'StatFormat', 'StatLetter',
+    'OpenDriveButton', 'NewProjectButton', 'EjectButton', 'StatSize', 'StatFree',
+    'StatFormat', 'StatLetter',
     'StatLastConnected', 'StatLastUser', 'UsagePanel', 'UsageBar', 'UsageFill', 'UsageLabel',
     'TabContents', 'TabHistory', 'ContentsTree',
     'HistoryScroll', 'HistoryPanel', 'TabPlaceholder', 'ContentsNote', 'SearchPane',
@@ -697,6 +701,7 @@ function Show-Detail {
         $script:DetailStatus.Text = 'Connected'
         $script:DetailStatus.Foreground = $script:BrushGreen
         $script:OpenDriveButton.Visibility = 'Visible'
+        $script:NewProjectButton.Visibility = 'Visible'
         $script:EjectButton.Visibility = 'Visible'
     } else {
         $script:DetailIndicator.Background = $script:BrushGrey
@@ -704,6 +709,7 @@ function Show-Detail {
         $script:DetailStatus.Text = 'Not connected'
         $script:DetailStatus.Foreground = $script:BrushDim
         $script:OpenDriveButton.Visibility = 'Collapsed'
+        $script:NewProjectButton.Visibility = 'Collapsed'
         $script:EjectButton.Visibility = 'Collapsed'
     }
 
@@ -1223,6 +1229,40 @@ function Invoke-Rescan {
     }
 }
 
+function New-DriveProject {
+    $record = Get-SelectedRecord
+    if (-not $record -or -not $record.VolumePath) { return }
+
+    $name = [Microsoft.VisualBasic.Interaction]::InputBox(
+        'Name for the new project:', 'New Project', 'My Project')
+    if (-not $name) { return }
+    $rejection = Get-ProjectNameRejection $name
+    if ($rejection) {
+        [System.Windows.MessageBox]::Show($rejection, 'New Project') | Out-Null
+        return
+    }
+
+    # Where to put it -- the drive's root to start with.
+    $parent = $record.VolumePath
+    try {
+        $shell = New-Object -ComObject Shell.Application
+        $chosen = $shell.BrowseForFolder(0, 'Where should the project folder go?', 0, $parent)
+        if (-not $chosen) { return }        # cancelled
+        $parent = $chosen.Self.Path
+    } catch {
+        # No picker available: fall back to the drive root.
+    }
+
+    $result = New-ProjectFolders $name $parent
+    if (-not $result.Ok) {
+        [System.Windows.MessageBox]::Show($result.Error, 'New Project',
+            [System.Windows.MessageBoxButton]::OK, [System.Windows.MessageBoxImage]::Warning) | Out-Null
+        return
+    }
+    Start-Process -FilePath 'explorer.exe' -ArgumentList $result.Path
+    Invoke-Rescan
+}
+
 function Test-WatcherInstalled {
     # The installer registers a scheduled task, or falls back to a Startup
     # shortcut when task registration is blocked. Either counts as installed.
@@ -1247,6 +1287,8 @@ function Update-WatcherBanner {
 $script:RescanButton.add_Click({ Invoke-Rescan })
 
 $script:NewFolderButton.add_Click({ New-DriveFolder $null })
+
+$script:NewProjectButton.add_Click({ New-DriveProject })
 
 $script:OpenDriveButton.add_Click({
     $record = Get-SelectedRecord

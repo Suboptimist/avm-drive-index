@@ -4,6 +4,7 @@ import AppKit
 struct DriveDetailView: View {
     let drive: DriveRecord
     @EnvironmentObject var store: IndexStore
+    @State private var showingNewProject = false
     @State private var tab: Tab = .folders
 
     enum Tab: Hashable { case folders, history }
@@ -19,6 +20,10 @@ struct DriveDetailView: View {
             }
         }
         .background(Pip.bg)
+        .sheet(isPresented: $showingNewProject) {
+            NewProjectSheet(drive: drive)
+                .environmentObject(store)
+        }
     }
 
     // MARK: Header
@@ -55,6 +60,9 @@ struct DriveDetailView: View {
                             NSWorkspace.shared.open(volume)
                         }
                         .buttonStyle(PipButtonStyle())
+                        Button("New Project") { showingNewProject = true }
+                            .buttonStyle(PipButtonStyle())
+                            .help("Create the standard project folder structure on this drive")
                         Button(store.ejectingID == drive.id ? "Ejecting…" : "⏏ Eject") {
                             store.eject(drive)
                         }

@@ -74,6 +74,11 @@ it's plain folders and text files, so nothing is locked inside the app.
 - **Search** (or press **Ctrl+F**) — searches the *entire* index: drive names,
   folder names, and file names across every drive ever connected. Click a
   result to jump to its drive; press Esc to clear.
+- **New Project** — creates the standard project folder layout on the drive
+  (`01_Project Files` with Davinci Resolve / Premiere / After Effects,
+  `02_Footage`, `03_Graphics`, `04_Music`, `05_Docs`, `06_Exports`). Asks for a
+  name and a location, then opens the new folder. It never merges into or
+  overwrites a folder that is already there.
 - **Open Drive / Eject** — shown only while a drive is connected.
 - **Rescan** — re-reads whatever is plugged in right now. You rarely need it;
   the background helper does this automatically.

@@ -58,6 +58,29 @@ inside them — anything you add there gets cleaned away on the next
 connection. Notes are safe as files directly in the drive's folder
 (files are never deleted, only folders are rebuilt).
 
+## New Project
+
+With a drive connected, **New Project** (next to Open Drive) creates the
+standard project layout on it:
+
+```
+<Project name>/
+  01_Project Files/
+    01_Davinci Resolve/
+    02_Premiere/
+    03_After Effects/
+  02_Footage/
+  03_Graphics/
+  04_Music/
+  05_Docs/
+  06_Exports/
+```
+
+Give it a name, pick where it goes (the drive's top level to start with), and
+it makes the folders and opens the result in Finder. An existing folder of the
+same name is never merged into or overwritten — you get told the name is taken
+instead. This replaces the old "AVM Folder Structure" applet.
+
 ## Turning it on (once)
 
 Double-click **`Install Drive Indexer.command`**.

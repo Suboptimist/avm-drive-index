@@ -26,6 +26,8 @@ This keeps a searchable index of all of them, so you don't have to.
 - **Shows how much room is left** — free space alongside total size, plus a
   bar showing how full the drive is (amber past 90%), so you know which drive
   to reach for before you unplug anything.
+- **Starts new projects for you** — one button creates a consistent folder
+  layout on the drive, so every job is filed the same way.
 - **Records who used it last** — the user account signed in each time the
   drive was connected, with a full connection history.
 - **Searches everything at once** — drive names, folder names and file names
@@ -38,6 +40,30 @@ This keeps a searchable index of all of them, so you don't have to.
 | Every connection, and who made it | Search across every drive at once |
 |---|---|
 | ![Connection history](screenshots/02-history.png) | ![Search results](screenshots/03-search.png) |
+
+## New Project
+
+With a drive connected, **New Project** creates a consistent folder layout on
+it — no more building the same tree by hand for every job:
+
+```
+<Project name>/
+  01_Project Files/
+    01_Davinci Resolve/
+    02_Premiere/
+    03_After Effects/
+  02_Footage/
+  03_Graphics/
+  04_Music/
+  05_Docs/
+  06_Exports/
+```
+
+![Creating a new project](screenshots/04-new-project.png)
+
+Name it, choose where it goes (the drive's top level by default), and the
+folders appear. A folder that already exists is never merged into or
+overwritten; you're told the name is taken instead.
 
 ## Download
 

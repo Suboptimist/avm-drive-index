@@ -457,6 +457,65 @@ function Get-VolumeFingerprint {
     return ($parts.ToArray() -join '|')
 }
 
+# ---------------------------------------------------------------- new project
+
+# The standard project layout, matching the "AVM Folder Structure" tool this
+# replaces. Parents are listed explicitly so the app can show what it makes.
+$script:ProjectFolders = @(
+    '01_Project Files'
+    '01_Project Files\01_Davinci Resolve'
+    '01_Project Files\02_Premiere'
+    '01_Project Files\03_After Effects'
+    '02_Footage'
+    '03_Graphics'
+    '04_Music'
+    '05_Docs'
+    '06_Exports'
+)
+
+function Get-ProjectNameRejection([string]$Name) {
+    # Returns why the name cannot be used, or '' when it is fine.
+    $trimmed = ([string]$Name).Trim()
+    if ([string]::IsNullOrWhiteSpace($trimmed)) { return 'Enter a project name.' }
+    if ($trimmed.StartsWith('.')) { return 'A name starting with a dot would be hidden.' }
+    if ($trimmed.Length -gt 200) { return 'That name is too long.' }
+    foreach ($ch in @('<', '>', ':', '"', '/', '\', '|', '?', '*')) {
+        if ($trimmed.Contains($ch)) { return "A name cannot contain $ch" }
+    }
+    return ''
+}
+
+function New-ProjectFolders([string]$Name, [string]$Parent) {
+    # Never merges into an existing folder: that is reported as an error so
+    # nothing already on the drive can be disturbed.
+    $trimmed = ([string]$Name).Trim()
+    $rejection = Get-ProjectNameRejection $trimmed
+    if ($rejection) { return [pscustomobject]@{ Ok = $false; Path = $null; Error = $rejection } }
+    if (-not (Test-Path -LiteralPath $Parent)) {
+        return [pscustomobject]@{ Ok = $false; Path = $null; Error = "That location no longer exists." }
+    }
+    $root = Join-Path $Parent $trimmed
+    if (Test-Path -LiteralPath $root) {
+        return [pscustomobject]@{ Ok = $false; Path = $root
+                                  Error = "`"$trimmed`" already exists in that location." }
+    }
+    try {
+        New-Item -ItemType Directory -Path $root -ErrorAction Stop | Out-Null
+        foreach ($folder in $script:ProjectFolders) {
+            # Build the path a segment at a time rather than trusting the
+            # separator in the literal.
+            $target = $root
+            foreach ($part in ($folder -split '[\\/]')) {
+                if ($part) { $target = Join-Path $target $part }
+            }
+            New-Item -ItemType Directory -Path $target -Force -ErrorAction Stop | Out-Null
+        }
+    } catch {
+        return [pscustomobject]@{ Ok = $false; Path = $root; Error = $_.Exception.Message }
+    }
+    return [pscustomobject]@{ Ok = $true; Path = $root; Error = '' }
+}
+
 # ---------------------------------------------------------------- search
 
 $script:FileListCache = @{}

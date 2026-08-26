@@ -47,8 +47,8 @@ C:\Users\<you>\AppData\Local\AVM Drive Index\
                              connected, and who was signed in
   Drives\
     Project Archive 2026\     one folder per drive you've ever connected
-      _DRIVE INFO.txt        size, format, drive letter, last connected,
-                             last used by, and a full connection history
+      _DRIVE INFO.txt        size, free space, format, drive letter, last
+                             connected, last used by, and full history
       _FILE LIST.txt         every file with its size (up to 20,000 files,
                              6 levels deep) — powers browsing and search
       <folders...>           the drive's folder structure, mirrored as real
@@ -64,6 +64,8 @@ it's plain folders and text files, so nothing is locked inside the app.
 - **Sidebar** — every drive ever connected. A **green** indicator and dot mean
   it's plugged in right now; **grey** means it isn't, with a note like
   "2 hours ago" and who used it.
+- **Free space** — how much room was left the last time the drive was
+  plugged in, shown next to its total size.
 - **Contents** — the drive's folders and files with sizes, browsable even when
   the drive is nowhere near you.
 - **History** — every connection, with the date and the Windows account that

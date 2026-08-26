@@ -188,6 +188,7 @@ foreach ($volume in (Get-ExternalVolume)) {
     $info.Add((Format-InfoLine 'DRIVE' $displayName)) | Out-Null
     $info.Add((Format-InfoLine 'DRIVE LETTER' $volume.Letter)) | Out-Null
     $info.Add((Format-InfoLine 'SIZE' (Format-DriveSize $volume.SizeBytes))) | Out-Null
+    $info.Add((Format-InfoLine 'FREE SPACE' (Format-FreeSpace $volume.FreeBytes $volume.SizeBytes))) | Out-Null
     $info.Add((Format-InfoLine 'FORMAT' $volume.FileSystem)) | Out-Null
     $info.Add((Format-InfoLine 'VOLUME SERIAL' $serialText)) | Out-Null
     $info.Add('') | Out-Null
@@ -225,8 +226,8 @@ foreach ($record in (Get-AllDriveRecords)) {
     }
     $rows.Add([pscustomobject]@{
         Sort = $record.LastConnectedString
-        Line = ('{0,-30} {1,-18} {2}{3}' -f $record.IndexFolderName,
-                    $record.LastConnectedString, $record.LastUser, $mark)
+        Line = ('{0,-30} {1,-18} {2,-22} {3}{4}' -f $record.IndexFolderName,
+                    $record.LastConnectedString, $record.FreeSpace, $record.LastUser, $mark)
     }) | Out-Null
 }
 
@@ -234,8 +235,8 @@ $overview = New-Object System.Collections.Generic.List[string]
 $overview.Add('EXTERNAL DRIVES -- updated automatically whenever a drive is connected') | Out-Null
 $overview.Add("Last updated: $now") | Out-Null
 $overview.Add('') | Out-Null
-$overview.Add(('{0,-30} {1,-18} {2}' -f 'DRIVE', 'LAST CONNECTED', 'LAST USED BY')) | Out-Null
-$overview.Add(('{0,-30} {1,-18} {2}' -f '-----', '--------------', '------------')) | Out-Null
+$overview.Add(('{0,-30} {1,-18} {2,-22} {3}' -f 'DRIVE', 'LAST CONNECTED', 'FREE SPACE', 'LAST USED BY')) | Out-Null
+$overview.Add(('{0,-30} {1,-18} {2,-22} {3}' -f '-----', '--------------', '----------', '------------')) | Out-Null
 foreach ($row in ($rows | Sort-Object -Property Sort -Descending)) {
     $overview.Add($row.Line) | Out-Null
 }

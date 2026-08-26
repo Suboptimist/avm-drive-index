@@ -184,9 +184,29 @@ $history"
         files_note="could not read this drive's contents"
     fi
 
+    # How much room is left, as of right now. `df` is used rather than
+    # `diskutil` because it reports the same way for every filesystem, and it
+    # works even when the drive's contents cannot be listed.
+    free_space=""
+    df_line="$(df -k "$vol" 2>/dev/null | tail -1)"
+    if [ -n "$df_line" ]; then
+        free_space="$(printf '%s\n' "$df_line" | awk '{
+            total = $2 * 1024; avail = $4 * 1024
+            if (total <= 0) exit
+            pct = (avail * 100) / total
+            n = split("bytes KB MB GB TB PB", u, " ")
+            v = avail; i = 1
+            while (v >= 1000 && i < n) { v /= 1000; i++ }
+            if (i == 1)          printf "%d %s (%.0f%% free)", v, u[i], pct
+            else if (v >= 100)   printf "%.0f %s (%.0f%% free)", v, u[i], pct
+            else                 printf "%.1f %s (%.0f%% free)", v, u[i], pct
+        }')"
+    fi
+
     {
         echo "DRIVE:           $name"
         echo "SIZE:            ${size:-unknown}"
+        echo "FREE SPACE:      ${free_space:-unknown}"
         echo "FORMAT:          ${fs:-unknown}"
         echo "UUID:            ${uuid:-none}"
         echo ""
@@ -223,9 +243,10 @@ for d in "$DRIVES_DIR"/*/; do
     dn="$(basename "$d")"
     lc="$(sed -n 's/^LAST CONNECTED:  *//p' "$d/$INFO_NAME")"
     lu="$(sed -n 's/^LAST USED BY:  *//p' "$d/$INFO_NAME")"
+    fr="$(sed -n 's/^FREE SPACE:  *//p' "$d/$INFO_NAME")"
     mark=""
     case "$CONNECTED_NOW" in *"|$dn|"*) mark="  ← connected right now" ;; esac
-    rows="$rows$lc|$dn|$lu|$mark
+    rows="$rows$lc|$dn|$lu|$fr|$mark
 "
 done
 
@@ -233,10 +254,10 @@ done
     echo "EXTERNAL DRIVES — updated automatically whenever a drive is connected"
     echo "Last updated: $NOW"
     echo ""
-    printf '%-30s %-18s %s\n' "DRIVE" "LAST CONNECTED" "LAST USED BY"
-    printf '%-30s %-18s %s\n' "-----" "--------------" "------------"
-    printf '%s' "$rows" | grep -v '^$' | sort -r | while IFS='|' read -r lc dn lu mark; do
-        printf '%-30s %-18s %s%s\n' "$dn" "$lc" "$lu" "$mark"
+    printf '%-30s %-18s %-22s %s\n' "DRIVE" "LAST CONNECTED" "FREE SPACE" "LAST USED BY"
+    printf '%-30s %-18s %-22s %s\n' "-----" "--------------" "----------" "------------"
+    printf '%s' "$rows" | grep -v '^$' | sort -r | while IFS='|' read -r lc dn lu fr mark; do
+        printf '%-30s %-18s %-22s %s%s\n' "$dn" "$lc" "$fr" "$lu" "$mark"
     done
     echo ""
     echo "Open the \"Drives\" folder to browse each drive's folder structure."

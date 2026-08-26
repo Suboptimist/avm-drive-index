@@ -95,6 +95,13 @@ function Format-DriveSize([long]$Bytes) {
     return ('{0:N1} {1}' -f $rounded, $units[$i])
 }
 
+function Format-FreeSpace([long]$FreeBytes, [long]$TotalBytes) {
+    # e.g. "812.4 GB (20% free)". The percentage is of the whole drive.
+    if ($FreeBytes -le 0 -or $TotalBytes -le 0) { return 'unknown' }
+    $percent = [math]::Round(($FreeBytes * 100.0) / $TotalBytes)
+    return ('{0} ({1}% free)' -f (Format-DriveSize $FreeBytes), $percent)
+}
+
 function Get-RelativeTimeText([datetime]$When) {
     $span = (Get-Date) - $When
     $seconds = $span.TotalSeconds
@@ -206,6 +213,7 @@ function Read-DriveRecord([string]$FolderPath) {
         Name                = $name
         Letter              = Get-InfoField $lines 'DRIVE LETTER'
         Size                = Get-InfoField $lines 'SIZE'
+        FreeSpace           = Get-InfoField $lines 'FREE SPACE'
         Format              = Get-InfoField $lines 'FORMAT'
         Serial              = Get-InfoField $lines 'VOLUME SERIAL'
         LastConnectedString = $lastConnectedString
@@ -416,6 +424,7 @@ function Get-ExternalVolume {
             Serial     = [string]$logical.VolumeSerialNumber
             FileSystem = [string]$logical.FileSystem
             SizeBytes  = [long]$logical.Size
+            FreeBytes  = [long]$logical.FreeSpace
         }
     }
 }

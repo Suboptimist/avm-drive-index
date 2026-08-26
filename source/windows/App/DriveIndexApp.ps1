@@ -181,6 +181,7 @@ $xamlText = @'
 
             <StackPanel Grid.Row="1" Margin="16,10,16,0">
               <TextBlock Name="StatSize" FontFamily="Consolas" FontSize="12" Foreground="#E0FFFFFF"/>
+              <TextBlock Name="StatFree" FontFamily="Consolas" FontSize="12" Foreground="#E0FFFFFF"/>
               <TextBlock Name="StatFormat" FontFamily="Consolas" FontSize="12" Foreground="#E0FFFFFF"/>
               <TextBlock Name="StatLetter" FontFamily="Consolas" FontSize="12" Foreground="#E0FFFFFF"/>
               <TextBlock Name="StatLastConnected" FontFamily="Consolas" FontSize="12" Foreground="#E0FFFFFF"/>
@@ -284,7 +285,7 @@ try {
 foreach ($name in @('SidebarPanel', 'SearchInput', 'SearchPlaceholder', 'SearchShell',
     'NewFolderButton', 'RescanButton', 'PlaceholderPane', 'PlaceholderTitle', 'PlaceholderBody',
     'DetailPane', 'DetailIndicator', 'DetailName', 'DetailDot', 'DetailStatus',
-    'OpenDriveButton', 'EjectButton', 'StatSize', 'StatFormat', 'StatLetter',
+    'OpenDriveButton', 'EjectButton', 'StatSize', 'StatFree', 'StatFormat', 'StatLetter',
     'StatLastConnected', 'StatLastUser', 'TabContents', 'TabHistory', 'ContentsTree',
     'HistoryScroll', 'HistoryPanel', 'TabPlaceholder', 'ContentsNote', 'SearchPane',
     'SearchSummary', 'SearchResultsPanel', 'WatcherBanner', 'TurnOnButton')) {
@@ -703,7 +704,15 @@ function Show-Detail {
         }
     }
 
+    # Free space can only be measured while the drive is plugged in, so for
+    # anything else this is the reading from its last connection.
+    $freeText = Get-Value $record.FreeSpace
+    if ($freeText -ne '--' -and -not $record.IsConnected) {
+        $freeText = "$freeText  (at last connection)"
+    }
+
     $script:StatSize.Text          = 'Size'.PadRight(16) + (Get-Value $record.Size)
+    $script:StatFree.Text          = 'Free space'.PadRight(16) + $freeText
     $script:StatFormat.Text        = 'Format'.PadRight(16) + (Get-Value $record.Format)
     $script:StatLetter.Text        = 'Drive letter'.PadRight(16) + (Get-Value $record.Letter)
     $script:StatLastConnected.Text = 'Last connected'.PadRight(16) + $lastConnected

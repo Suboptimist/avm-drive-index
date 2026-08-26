@@ -21,6 +21,7 @@ struct DriveRecord: Identifiable, Hashable {
     let indexFolderName: String   // e.g. "Untitled (2)"
     let name: String              // the drive's real volume name
     let size: String
+    let freeSpace: String   // snapshot from the last connection
     let format: String
     let uuid: String?
     let lastConnected: Date?
@@ -88,6 +89,7 @@ enum InfoFileParser {
             indexFolderName: folderURL.lastPathComponent,
             name: name,
             size: field("SIZE:"),
+            freeSpace: field("FREE SPACE:"),
             format: field("FORMAT:"),
             uuid: uuid,
             lastConnected: dateFormatter.date(from: lastConnectedString),

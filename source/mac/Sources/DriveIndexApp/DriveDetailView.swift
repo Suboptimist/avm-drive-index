@@ -66,6 +66,7 @@ struct DriveDetailView: View {
 
             VStack(alignment: .leading, spacing: 3) {
                 infoLine("Size", value(drive.size))
+                infoLine("Free space", freeSpaceText)
                 infoLine("Format", value(drive.format))
                 infoLine("Last connected", lastConnectedText)
                 infoLine("Last used by", value(drive.lastUser))
@@ -86,6 +87,14 @@ struct DriveDetailView: View {
                 .foregroundStyle(Pip.text)
         }
         .font(.system(size: 11.5, design: .monospaced))
+    }
+
+    // Free space can only be measured while the drive is plugged in, so for
+    // anything else this is the reading from its last connection.
+    private var freeSpaceText: String {
+        let free = value(drive.freeSpace)
+        if free == "—" || drive.isConnected { return free }
+        return "\(free)  (at last connection)"
     }
 
     private var lastConnectedText: String {

@@ -186,6 +186,20 @@ $xamlText = @'
               <TextBlock Name="StatLetter" FontFamily="Consolas" FontSize="12" Foreground="#E0FFFFFF"/>
               <TextBlock Name="StatLastConnected" FontFamily="Consolas" FontSize="12" Foreground="#E0FFFFFF"/>
               <TextBlock Name="StatLastUser" FontFamily="Consolas" FontSize="12" Foreground="#E0FFFFFF"/>
+              <StackPanel Name="UsagePanel" Orientation="Horizontal" Margin="0,7,0,0"
+                          Visibility="Collapsed">
+                <Border Width="300" Height="7" CornerRadius="3" Background="#24FFFFFF">
+                  <Grid Name="UsageBar">
+                    <Grid.ColumnDefinitions>
+                      <ColumnDefinition Width="0*"/>
+                      <ColumnDefinition Width="100*"/>
+                    </Grid.ColumnDefinitions>
+                    <Border Grid.Column="0" Background="#4DE680" CornerRadius="3"/>
+                  </Grid>
+                </Border>
+                <TextBlock Name="UsageLabel" FontFamily="Consolas" FontSize="11"
+                           Foreground="#8CFFFFFF" Margin="10,0,0,0" VerticalAlignment="Center"/>
+              </StackPanel>
             </StackPanel>
 
             <Rectangle Grid.Row="2" Fill="#24FFFFFF" Height="1" Margin="0,14,0,0"/>
@@ -286,7 +300,8 @@ foreach ($name in @('SidebarPanel', 'SearchInput', 'SearchPlaceholder', 'SearchS
     'NewFolderButton', 'RescanButton', 'PlaceholderPane', 'PlaceholderTitle', 'PlaceholderBody',
     'DetailPane', 'DetailIndicator', 'DetailName', 'DetailDot', 'DetailStatus',
     'OpenDriveButton', 'EjectButton', 'StatSize', 'StatFree', 'StatFormat', 'StatLetter',
-    'StatLastConnected', 'StatLastUser', 'TabContents', 'TabHistory', 'ContentsTree',
+    'StatLastConnected', 'StatLastUser', 'UsagePanel', 'UsageBar', 'UsageLabel',
+    'TabContents', 'TabHistory', 'ContentsTree',
     'HistoryScroll', 'HistoryPanel', 'TabPlaceholder', 'ContentsNote', 'SearchPane',
     'SearchSummary', 'SearchResultsPanel', 'WatcherBanner', 'TurnOnButton')) {
     Set-Variable -Name $name -Scope Script -Value $window.FindName($name)
@@ -717,6 +732,20 @@ function Show-Detail {
     $script:StatLetter.Text        = 'Drive letter'.PadRight(16) + (Get-Value $record.Letter)
     $script:StatLastConnected.Text = 'Last connected'.PadRight(16) + $lastConnected
     $script:StatLastUser.Text      = 'Last used by'.PadRight(16) + (Get-Value $record.LastUser)
+
+    # Usage bar: two star-sized columns, so it scales with the window.
+    $used = 0
+    $haveUsed = [int]::TryParse([string]$record.UsedPercent, [ref]$used)
+    if ($haveUsed -and $used -ge 0 -and $used -le 100) {
+        $script:UsageBar.ColumnDefinitions[0].Width =
+            New-Object System.Windows.GridLength ($used, 'Star')
+        $script:UsageBar.ColumnDefinitions[1].Width =
+            New-Object System.Windows.GridLength ((100 - $used), 'Star')
+        $script:UsageLabel.Text = "$used% used"
+        $script:UsagePanel.Visibility = 'Visible'
+    } else {
+        $script:UsagePanel.Visibility = 'Collapsed'
+    }
 
     $script:ContentsNote.Text = $record.ContentsNote
     $script:TabHistory.Content = "History ($($record.History.Count))"

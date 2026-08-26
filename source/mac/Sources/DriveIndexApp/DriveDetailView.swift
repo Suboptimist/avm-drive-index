@@ -70,9 +70,34 @@ struct DriveDetailView: View {
                 infoLine("Format", value(drive.format))
                 infoLine("Last connected", lastConnectedText)
                 infoLine("Last used by", value(drive.lastUser))
+                usageBar
             }
         }
         .padding(16)
+    }
+
+    // How full the drive was when it was last measured.
+    @ViewBuilder
+    private var usageBar: some View {
+        if let used = drive.usedPercent, used >= 0, used <= 100 {
+            HStack(spacing: 10) {
+                GeometryReader { geo in
+                    ZStack(alignment: .leading) {
+                        RoundedRectangle(cornerRadius: 3.5)
+                            .fill(Pip.faint)
+                        RoundedRectangle(cornerRadius: 3.5)
+                            .fill(Pip.green)
+                            .frame(width: max(2, geo.size.width * CGFloat(used) / 100))
+                            .pipGlow(drive.isConnected ? 0.5 : 0)
+                    }
+                }
+                .frame(width: 300, height: 7)
+                Text("\(used)% used")
+                    .font(.system(size: 11, design: .monospaced))
+                    .foregroundStyle(Pip.dim)
+            }
+            .padding(.top, 5)
+        }
     }
 
     private func value(_ s: String) -> String {

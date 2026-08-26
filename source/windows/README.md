@@ -65,7 +65,8 @@ it's plain folders and text files, so nothing is locked inside the app.
   it's plugged in right now; **grey** means it isn't, with a note like
   "2 hours ago" and who used it.
 - **Free space** — how much room was left the last time the drive was
-  plugged in, shown next to its total size.
+  plugged in, shown next to its total size, with a bar showing how full the
+  drive is.
 - **Contents** — the drive's folders and files with sizes, browsable even when
   the drive is nowhere near you.
 - **History** — every connection, with the date and the Windows account that

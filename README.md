@@ -23,8 +23,9 @@ This keeps a searchable index of all of them, so you don't have to.
   background, whether or not the app is open.
 - **Remembers folders *and* files**, with sizes, so you can browse a drive
   that's sitting in a drawer on the other side of the building.
-- **Shows how much room is left** — free space alongside total size, so you
-  know which drive to reach for before you unplug anything.
+- **Shows how much room is left** — free space alongside total size, plus a
+  bar showing how full the drive is, so you know which drive to reach for
+  before you unplug anything.
 - **Records who used it last** — the user account signed in each time the
   drive was connected, with a full connection history.
 - **Searches everything at once** — drive names, folder names and file names
@@ -150,8 +151,9 @@ with a free-space column.
 ## Free space — a snapshot, not a live reading
 
 A drive's free space can only be measured while it's plugged in, so what you
-see for an unplugged drive is the reading from its last connection, labelled
-*"at last connection"*. Reconnect the drive and it updates itself.
+see for an unplugged drive — the figure and the usage bar alike — is the
+reading from its last connection, labelled *"at last connection"*. Reconnect
+the drive and it updates itself.
 
 ## "Last used by" — what it can and can't see
 

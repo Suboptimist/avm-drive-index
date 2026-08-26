@@ -22,6 +22,7 @@ struct DriveRecord: Identifiable, Hashable {
     let name: String              // the drive's real volume name
     let size: String
     let freeSpace: String   // snapshot from the last connection
+    let usedPercent: Int?   // 0-100, for the usage bar; nil when unknown
     let format: String
     let uuid: String?
     let lastConnected: Date?
@@ -90,6 +91,7 @@ enum InfoFileParser {
             name: name,
             size: field("SIZE:"),
             freeSpace: field("FREE SPACE:"),
+            usedPercent: Int(field("USED PERCENT:")),
             format: field("FORMAT:"),
             uuid: uuid,
             lastConnected: dateFormatter.date(from: lastConnectedString),

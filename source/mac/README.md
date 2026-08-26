@@ -12,8 +12,9 @@ It comes in two parts that work together:
 2. **AVM Drive Index.app** — a normal Mac app (it lives in the Drive
    Index folder) for browsing everything: the list of drives in a
    sidebar (green = connected right now, gray = not), each drive's
-   folders *and files* with sizes, how much room is left, who used it
-   last, and the full connection history. It can search the entire index (⌘F) — drive
+   folders *and files* with sizes, how much room is left (with a bar
+   showing how full the drive is), who used it last, and the full
+   connection history. It can search the entire index (⌘F) — drive
    names, folders, and files across every drive ever connected — and
    lets you reorder drives and group them into folders in the sidebar.
 

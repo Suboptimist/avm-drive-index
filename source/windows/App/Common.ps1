@@ -102,6 +102,16 @@ function Format-FreeSpace([long]$FreeBytes, [long]$TotalBytes) {
     return ('{0} ({1}% free)' -f (Format-DriveSize $FreeBytes), $percent)
 }
 
+function Get-UsedPercent([long]$FreeBytes, [long]$TotalBytes) {
+    # Whole-number percent of the drive that is occupied. Empty when unknown,
+    # so the app can leave the usage bar out entirely.
+    if ($FreeBytes -lt 0 -or $TotalBytes -le 0) { return '' }
+    $used = [math]::Round((($TotalBytes - $FreeBytes) * 100.0) / $TotalBytes)
+    if ($used -lt 0) { $used = 0 }
+    if ($used -gt 100) { $used = 100 }
+    return [string][int]$used
+}
+
 function Get-RelativeTimeText([datetime]$When) {
     $span = (Get-Date) - $When
     $seconds = $span.TotalSeconds
@@ -214,6 +224,7 @@ function Read-DriveRecord([string]$FolderPath) {
         Letter              = Get-InfoField $lines 'DRIVE LETTER'
         Size                = Get-InfoField $lines 'SIZE'
         FreeSpace           = Get-InfoField $lines 'FREE SPACE'
+        UsedPercent         = Get-InfoField $lines 'USED PERCENT'
         Format              = Get-InfoField $lines 'FORMAT'
         Serial              = Get-InfoField $lines 'VOLUME SERIAL'
         LastConnectedString = $lastConnectedString

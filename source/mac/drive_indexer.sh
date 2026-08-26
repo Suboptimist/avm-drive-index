@@ -188,25 +188,33 @@ $history"
     # `diskutil` because it reports the same way for every filesystem, and it
     # works even when the drive's contents cannot be listed.
     free_space=""
+    used_percent=""
     df_line="$(df -k "$vol" 2>/dev/null | tail -1)"
     if [ -n "$df_line" ]; then
-        free_space="$(printf '%s\n' "$df_line" | awk '{
+        # "<free space text>|<whole-number percent used>"
+        df_out="$(printf '%s\n' "$df_line" | awk '{
             total = $2 * 1024; avail = $4 * 1024
             if (total <= 0) exit
             pct = (avail * 100) / total
             n = split("bytes KB MB GB TB PB", u, " ")
             v = avail; i = 1
             while (v >= 1000 && i < n) { v /= 1000; i++ }
-            if (i == 1)          printf "%d %s (%.0f%% free)", v, u[i], pct
-            else if (v >= 100)   printf "%.0f %s (%.0f%% free)", v, u[i], pct
-            else                 printf "%.1f %s (%.0f%% free)", v, u[i], pct
+            if (i == 1)          s = sprintf("%d %s (%.0f%% free)", v, u[i], pct)
+            else if (v >= 100)   s = sprintf("%.0f %s (%.0f%% free)", v, u[i], pct)
+            else                 s = sprintf("%.1f %s (%.0f%% free)", v, u[i], pct)
+            printf "%s|%.0f", s, 100 - pct
         }')"
+        if [ -n "$df_out" ]; then
+            free_space="${df_out%%|*}"
+            used_percent="${df_out##*|}"
+        fi
     fi
 
     {
         echo "DRIVE:           $name"
         echo "SIZE:            ${size:-unknown}"
         echo "FREE SPACE:      ${free_space:-unknown}"
+        echo "USED PERCENT:    ${used_percent}"
         echo "FORMAT:          ${fs:-unknown}"
         echo "UUID:            ${uuid:-none}"
         echo ""

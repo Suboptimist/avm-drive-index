@@ -189,6 +189,7 @@ foreach ($volume in (Get-ExternalVolume)) {
     $info.Add((Format-InfoLine 'DRIVE LETTER' $volume.Letter)) | Out-Null
     $info.Add((Format-InfoLine 'SIZE' (Format-DriveSize $volume.SizeBytes))) | Out-Null
     $info.Add((Format-InfoLine 'FREE SPACE' (Format-FreeSpace $volume.FreeBytes $volume.SizeBytes))) | Out-Null
+    $info.Add((Format-InfoLine 'USED PERCENT' (Get-UsedPercent $volume.FreeBytes $volume.SizeBytes))) | Out-Null
     $info.Add((Format-InfoLine 'FORMAT' $volume.FileSystem)) | Out-Null
     $info.Add((Format-InfoLine 'VOLUME SERIAL' $serialText)) | Out-Null
     $info.Add('') | Out-Null

@@ -24,6 +24,7 @@ final class IndexStore: ObservableObject {
 
     init() {
         indexFolder = Self.locateIndexFolder()
+        syncIndexerScript()
         loadOrg()
         reload()
         checkWatcher()
@@ -43,6 +44,32 @@ final class IndexStore: ObservableObject {
         // Gentle safety net so the window never shows stale data for long.
         refreshTimer = Timer.scheduledTimer(withTimeInterval: 20, repeats: true) { [weak self] _ in
             Task { @MainActor in self?.reload() }
+        }
+    }
+
+    // MARK: - Keeping the installed scanner current
+
+    /// The scanner is copied into the index folder so the background helper
+    /// keeps working even if the app is moved or deleted. That copy has to be
+    /// refreshed whenever the app is updated, otherwise an updated app would go
+    /// on running the scanner it shipped with originally.
+    private func syncIndexerScript() {
+        guard let root = indexFolder,
+              let bundled = Bundle.main.resourceURL?
+                .appendingPathComponent("Drive Indexer Support/drive_indexer.sh"),
+              let shipped = try? Data(contentsOf: bundled)
+        else { return }
+
+        let fm = FileManager.default
+        guard fm.fileExists(atPath: root.path) else { return }   // not installed yet
+        let installed = root.appendingPathComponent("drive_indexer.sh")
+        if let current = try? Data(contentsOf: installed), current == shipped { return }
+
+        do {
+            try shipped.write(to: installed)
+            try fm.setAttributes([.posixPermissions: 0o755], ofItemAtPath: installed.path)
+        } catch {
+            // Not fatal: the previous scanner stays in place.
         }
     }
 

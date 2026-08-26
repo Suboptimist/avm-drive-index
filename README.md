@@ -69,8 +69,8 @@ It is deliberately careful with footage:
 - every copy's size is checked, and a short copy is deleted rather than left
   sitting there looking valid.
 
-Files land directly in the folder you choose, so pointing it at a project's
-`02_Footage` puts them straight where they belong.
+Point it at a project's `02_Footage` and that is exactly where the clips end
+up.
 
 ## New Project
 

@@ -74,6 +74,11 @@ it's plain folders and text files, so nothing is locked inside the app.
 - **Search** (or press **Ctrl+F**) — searches the *entire* index: drive names,
   folder names, and file names across every drive ever connected. Click a
   result to jump to its drive; press Esc to clear.
+- **Copy Files…** — pick files from a card (or any connected drive) and copy
+  them into a folder on another drive. Windows' own file picker is used, so
+  multi-select, previews and type filtering all work as you expect. Nothing is
+  removed from the source, files already at the destination are skipped rather
+  than overwritten, and every copy's size is checked.
 - **New Project** — creates the standard project folder layout on the drive
   (`01_Project Files` with Davinci Resolve / Premiere / After Effects,
   `02_Footage`, `03_Graphics`, `04_Music`, `05_Docs`, `06_Exports`). Asks for a
@@ -109,9 +114,10 @@ signed in at that moment. Two things to know:
 
 ## Good to know
 
-- **SD cards and memory cards are deliberately ignored**, as are mounted ISO
-  and VHD images, optical drives, and network drives — same as the Mac
-  version. Only real external storage is catalogued.
+- **Memory cards are never catalogued**, as with mounted ISO and VHD images,
+  optical drives and network drives — same as the Mac version. A card that is
+  plugged in does appear under **Cards** in the sidebar so you can copy off
+  it, and disappears again when you remove it.
 - **Two different drives with the same name** (or with no name at all) are kept
   apart automatically as "Name" and "Name (2)" — they're told apart by volume
   serial number, not by drive letter, so a drive that comes back as `F:`

@@ -32,6 +32,7 @@ struct DriveRecord: Identifiable, Hashable {
     let history: [HistoryEntry]
     let folderURL: URL            // the drive's folder inside the index
     let volumeURL: URL?           // where the drive is mounted right now, if it is
+    let isCard: Bool              // a memory card: shown while mounted, never catalogued
     let folderTree: [FolderNode]
 
     var isConnected: Bool { volumeURL != nil }
@@ -101,6 +102,7 @@ enum InfoFileParser {
             history: history,
             folderURL: folderURL,
             volumeURL: mountedVolume(uuid, name),
+            isCard: false,
             folderTree: contentTree(at: folderURL)
         )
     }

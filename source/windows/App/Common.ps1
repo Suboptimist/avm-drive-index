@@ -233,6 +233,7 @@ function Read-DriveRecord([string]$FolderPath) {
         ContentsNote        = ($notes -join ('  ' + $script:Dash + '  '))
         History             = $history.ToArray()
         FolderPath          = $FolderPath
+        IsCard              = $false
         IsConnected         = $false     # filled in by the caller
         VolumePath          = $null      # filled in by the caller
     }
@@ -320,6 +321,55 @@ function Get-DriveContentTree([string]$FolderPath) {
     return $root
 }
 
+function Get-LiveContentTree([string]$Root, [int]$MaxDepth = 6, [int]$MaxFiles = 5000) {
+    # A card's contents are read fresh: it has no index folder, and what is on
+    # it changes constantly.
+    $tree = New-ContentNode '' '' $false $null
+    $dirIndex = @{ '' = $tree }
+
+    function Get-LiveNode([string]$RelPath) {
+        if ($dirIndex.ContainsKey($RelPath)) { return $dirIndex[$RelPath] }
+        $parentRel = ''
+        $name = $RelPath
+        $slash = $RelPath.LastIndexOf('\')
+        if ($slash -ge 0) {
+            $parentRel = $RelPath.Substring(0, $slash)
+            $name = $RelPath.Substring($slash + 1)
+        }
+        $parent = Get-LiveNode $parentRel
+        $node = New-ContentNode $name $RelPath $false $null
+        $parent.Children.Add($node) | Out-Null
+        $dirIndex[$RelPath] = $node
+        return $node
+    }
+
+    if (-not (Test-Path -LiteralPath $Root)) { return $tree }
+    $prefixLength = $Root.TrimEnd('\', '/').Length + 1
+    $count = 0
+    foreach ($item in (Get-ChildItem -LiteralPath $Root -Recurse -Depth ($MaxDepth - 1) -ErrorAction SilentlyContinue)) {
+        if ($count -ge $MaxFiles) { break }
+        if ($item.FullName.Length -le $prefixLength) { continue }
+        $rel = $item.FullName.Substring($prefixLength).Replace('/', '\')
+        if ([string]::IsNullOrWhiteSpace($rel)) { continue }
+        if ($item.PSIsContainer) {
+            Get-LiveNode $rel | Out-Null
+            continue
+        }
+        $parentRel = ''
+        $name = $rel
+        $slash = $rel.LastIndexOf('\')
+        if ($slash -ge 0) {
+            $parentRel = $rel.Substring(0, $slash)
+            $name = $rel.Substring($slash + 1)
+        }
+        $parent = Get-LiveNode $parentRel
+        $parent.Children.Add((New-ContentNode $name $rel $true (Format-DriveSize $item.Length))) | Out-Null
+        $count++
+    }
+    Sort-ContentNode $tree
+    return $tree
+}
+
 function Sort-ContentNode($Node) {
     # Folders first, then files, each alphabetical -- matching the Mac app.
     if ($Node.Children.Count -eq 0) { return }
@@ -348,7 +398,7 @@ function Get-SafeFolderName([string]$Name) {
     return $clean
 }
 
-function Get-ExternalVolume {
+function Get-AttachedVolume {
     # Emits one object per external storage volume that currently has a drive
     # letter. Deliberately excludes internal disks, optical drives, network
     # drives, mounted ISO/VHD images, and SD/memory cards -- matching the
@@ -410,14 +460,16 @@ function Get-ExternalVolume {
         }
         if (-not $isExternal) { continue }
 
-        # Skip SD cards and other memory cards, including ones behind a USB card
-        # reader (which report themselves as plain USB storage).
-        if ($busType -eq 'SD' -or $busType -eq 'MMC') { continue }
+        # Memory cards, including ones behind a USB card reader (which report
+        # themselves as plain USB storage). Flagged rather than dropped: the
+        # catalogue still leaves them out, but the app shows them while they
+        # are plugged in so files can be copied off them.
+        $isCard = ($busType -eq 'SD' -or $busType -eq 'MMC')
         $modelText = ''
         if ($diskDrive) { $modelText = "$($diskDrive.Model) $($diskDrive.Caption) $($diskDrive.PNPDeviceID)" }
         if ($disk) { $modelText = "$modelText $($disk.FriendlyName)" }
         if ($modelText -match '(?i)(\bSD\b|SDHC|SDXC|\bMMC\b|Multi[-_ ]?Card|Card[-_ ]?Reader|CFast|CompactFlash|xD[-_ ]Picture|Memory[-_ ]?Card)') {
-            continue
+            $isCard = $true
         }
 
         $label = [string]$logical.VolumeName
@@ -436,6 +488,7 @@ function Get-ExternalVolume {
             FileSystem = [string]$logical.FileSystem
             SizeBytes  = [long]$logical.Size
             FreeBytes  = [long]$logical.FreeSpace
+            IsCard     = $isCard
         }
     }
 }
@@ -455,6 +508,45 @@ function Get-VolumeFingerprint {
         }
     } catch { }
     return ($parts.ToArray() -join '|')
+}
+
+function Get-ExternalVolume {
+    # What the catalogue covers: external storage, never memory cards.
+    Get-AttachedVolume | Where-Object { -not $_.IsCard }
+}
+
+function Get-CardVolume {
+    # Memory cards, shown only while they are plugged in.
+    Get-AttachedVolume | Where-Object { $_.IsCard }
+}
+
+# ---------------------------------------------------------------- copying
+
+function Copy-OneFile([string]$SourcePath, [string]$DestinationFolder) {
+    # Never removes anything from the source, never overwrites anything at the
+    # destination, and never leaves a short copy behind.
+    if (-not (Test-Path -LiteralPath $SourcePath -PathType Leaf)) {
+        return [pscustomobject]@{ Status = 'failed'; Bytes = 0; Error = 'the file is no longer there' }
+    }
+    $name = Split-Path $SourcePath -Leaf
+    $target = Join-Path $DestinationFolder $name
+    if (Test-Path -LiteralPath $target) {
+        return [pscustomobject]@{ Status = 'skipped'; Bytes = 0; Error = '' }
+    }
+    $expected = (Get-Item -LiteralPath $SourcePath).Length
+    try {
+        Copy-Item -LiteralPath $SourcePath -Destination $target -ErrorAction Stop
+    } catch {
+        return [pscustomobject]@{ Status = 'failed'; Bytes = 0; Error = $_.Exception.Message }
+    }
+    $written = 0
+    try { $written = (Get-Item -LiteralPath $target).Length } catch { }
+    if ($written -ne $expected) {
+        Remove-Item -LiteralPath $target -Force -ErrorAction SilentlyContinue
+        return [pscustomobject]@{ Status = 'failed'; Bytes = 0
+                                  Error = "copied $written of $expected bytes" }
+    }
+    return [pscustomobject]@{ Status = 'copied'; Bytes = $expected; Error = '' }
 }
 
 # ---------------------------------------------------------------- new project

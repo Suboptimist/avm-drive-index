@@ -26,6 +26,8 @@ This keeps a searchable index of all of them, so you don't have to.
 - **Shows how much room is left** — free space alongside total size, plus a
   bar showing how full the drive is (amber past 90%), so you know which drive
   to reach for before you unplug anything.
+- **Offloads memory cards** — insert a card, pick the files you want, and copy
+  them into a folder on another drive without overwriting anything.
 - **Starts new projects for you** — one button creates a consistent folder
   layout on the drive, so every job is filed the same way.
 - **Records who used it last** — the user account signed in each time the
@@ -40,6 +42,26 @@ This keeps a searchable index of all of them, so you don't have to.
 | Every connection, and who made it | Search across every drive at once |
 |---|---|
 | ![Connection history](screenshots/02-history.png) | ![Search results](screenshots/03-search.png) |
+
+## Copying off a card
+
+Insert a memory card and it appears under **Cards** in the sidebar. Cards are
+never catalogued — they get reformatted far too often to be worth a permanent
+record — they are simply there while plugged in, with their contents read
+fresh.
+
+![Choosing files to copy from a card](screenshots/05-copy.png)
+
+**Copy Files…** lets you pick files and a destination folder on another drive.
+It is deliberately careful with footage:
+
+- nothing is ever removed from the card,
+- a file already at the destination is skipped and listed, never overwritten,
+- every copy's size is checked, and a short copy is deleted rather than left
+  sitting there looking valid.
+
+Files land directly in the folder you choose, so pointing it at a project's
+`02_Footage` puts them straight where they belong.
 
 ## New Project
 

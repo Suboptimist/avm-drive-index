@@ -5,6 +5,7 @@ struct DriveDetailView: View {
     let drive: DriveRecord
     @EnvironmentObject var store: IndexStore
     @State private var showingNewProject = false
+    @State private var showingCopy = false
     @State private var tab: Tab = .folders
 
     enum Tab: Hashable { case folders, history }
@@ -22,6 +23,12 @@ struct DriveDetailView: View {
         .background(Pip.bg)
         .sheet(isPresented: $showingNewProject) {
             NewProjectSheet(drive: drive)
+                .environmentObject(store)
+        }
+        .sheet(isPresented: $showingCopy) {
+            CopyFilesSheet(volumeName: drive.indexFolderName,
+                           files: store.sourceFiles(for: drive),
+                           suggestedDestination: firstOtherDrive)
                 .environmentObject(store)
         }
     }
@@ -60,9 +67,14 @@ struct DriveDetailView: View {
                             NSWorkspace.shared.open(volume)
                         }
                         .buttonStyle(PipButtonStyle())
-                        Button("New Project") { showingNewProject = true }
+                        Button("Copy Files…") { showingCopy = true }
                             .buttonStyle(PipButtonStyle())
-                            .help("Create the standard project folder structure on this drive")
+                            .help("Copy chosen files from here onto another drive")
+                        if !drive.isCard {
+                            Button("New Project") { showingNewProject = true }
+                                .buttonStyle(PipButtonStyle())
+                                .help("Create the standard project folder structure on this drive")
+                        }
                         Button(store.ejectingID == drive.id ? "Ejecting…" : "⏏ Eject") {
                             store.eject(drive)
                         }
@@ -76,8 +88,12 @@ struct DriveDetailView: View {
                 infoLine("Size", value(drive.size))
                 infoLine("Free space", freeSpaceText)
                 infoLine("Format", value(drive.format))
-                infoLine("Last connected", lastConnectedText)
-                infoLine("Last used by", value(drive.lastUser))
+                if drive.isCard {
+                    infoLine("Kind", "Memory card — not catalogued")
+                } else {
+                    infoLine("Last connected", lastConnectedText)
+                    infoLine("Last used by", value(drive.lastUser))
+                }
                 usageBar
             }
         }
@@ -141,10 +157,18 @@ struct DriveDetailView: View {
 
     // MARK: Tabs
 
+    /// Somewhere sensible to start the destination picker: another drive that
+    /// is plugged in, rather than the card you are copying from.
+    private var firstOtherDrive: URL? {
+        store.drives.first { $0.id != drive.id && $0.volumeURL != nil }?.volumeURL
+    }
+
     private var tabs: some View {
         HStack(spacing: 8) {
             tabButton("Contents", .folders)
-            tabButton("History (\(drive.history.count))", .history)
+            if !drive.isCard {
+                tabButton("History (\(drive.history.count))", .history)
+            }
             Spacer()
         }
         .padding(.horizontal, 16)

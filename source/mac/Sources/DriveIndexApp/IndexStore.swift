@@ -12,6 +12,11 @@ final class IndexStore: ObservableObject {
     @Published var ejectingID: String?
     @Published var ejectError: String?
     @Published var org = Organization()
+    @Published var cards: [DriveRecord] = []
+
+    /// Walking a card is not free, so its files and tree are kept until the
+    /// card is unplugged or a rescan is asked for.
+    private var cardCache: [String: (files: [SourceFile], tree: [FolderNode])] = [:]
 
     private var dirWatcher: DispatchSourceFileSystemObject?
     private var watchedFD: CInt = -1
@@ -147,13 +152,64 @@ final class IndexStore: ObservableObject {
             if $0.isConnected != $1.isConnected { return $0.isConnected }
             return ($0.lastConnected ?? .distantPast) > ($1.lastConnected ?? .distantPast)
         }
+        reloadCards()
         lastUpdated = Date()
         reconcileOrg()
+    }
+
+    // MARK: - Memory cards (never catalogued, shown while mounted)
+
+    private func reloadCards() {
+        var records: [DriveRecord] = []
+        for card in CardVolumes.connected() {
+            let key = card.url.path
+            if cardCache[key] == nil {
+                let files = CardVolumes.files(at: card.url)
+                cardCache[key] = (files, CardVolumes.tree(from: files, rootPath: key))
+            }
+            guard let cached = cardCache[key] else { continue }
+            records.append(DriveRecord(
+                id: key,
+                indexFolderName: card.name,
+                name: card.name,
+                size: CardVolumes.sizeText(card.sizeBytes),
+                freeSpace: CardVolumes.freeText(size: card.sizeBytes, free: card.freeBytes),
+                usedPercent: CardVolumes.usedPercent(size: card.sizeBytes, free: card.freeBytes),
+                format: card.format,
+                uuid: nil,
+                lastConnected: nil,
+                lastConnectedString: "",
+                lastUser: "",
+                foldersNote: "\(cached.files.count) files on the card",
+                history: [],
+                folderURL: card.url,
+                volumeURL: card.url,
+                isCard: true,
+                folderTree: cached.tree))
+        }
+        cards = records
+
+        // Forget cards that have been taken out.
+        let mounted = Set(records.map(\.id))
+        for key in cardCache.keys where !mounted.contains(key) { cardCache.removeValue(forKey: key) }
+    }
+
+    /// The files on a card, for the copy sheet.
+    func sourceFiles(for record: DriveRecord) -> [SourceFile] {
+        if let cached = cardCache[record.id] { return cached.files }
+        guard let volume = record.volumeURL else { return [] }
+        return CardVolumes.files(at: volume)
+    }
+
+    /// Any record the sidebar can select, drive or card.
+    func record(withID id: String) -> DriveRecord? {
+        drives.first { $0.id == id } ?? cards.first { $0.id == id }
     }
 
     // MARK: - Rescanning (runs the same script the background helper uses)
 
     func rescan() {
+        cardCache.removeAll()      // pick up anything newly written to a card
         guard let script = indexerScript, let root = indexFolder, !isRescanning else { return }
         isRescanning = true
         let proc = Process()

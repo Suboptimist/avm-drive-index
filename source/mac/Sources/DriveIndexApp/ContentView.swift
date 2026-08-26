@@ -133,7 +133,7 @@ struct ContentView: View {
                     selection = hit.driveID
                     searchText = ""
                 }
-            } else if let sel = selection, let drive = store.drives.first(where: { $0.id == sel }) {
+            } else if let sel = selection, let drive = store.record(withID: sel) {
                 DriveDetailView(drive: drive)
             } else {
                 PipEmpty(
@@ -151,7 +151,7 @@ struct ContentView: View {
         let query = searchText.trimmingCharacters(in: .whitespaces).lowercased()
         guard !query.isEmpty else { return [] }
         var hits: [SearchHit] = []
-        outer: for drive in store.drives {
+        outer: for drive in store.drives + store.cards {
             if drive.indexFolderName.lowercased().contains(query) {
                 hits.append(SearchHit(
                     id: "drive:\(drive.id)", driveID: drive.id,
@@ -192,6 +192,20 @@ struct ContentView: View {
                 }
             } header: {
                 sectionHeader("Drives")
+            }
+
+            if !store.cards.isEmpty {
+                Section {
+                    ForEach(store.cards) { card in
+                        PipDriveRow(drive: card, selected: selection == card.id)
+                            .contentShape(Rectangle())
+                            .onTapGesture { selection = card.id }
+                            .listRowSeparator(.hidden)
+                            .listRowInsets(EdgeInsets(top: 2, leading: 8, bottom: 2, trailing: 8))
+                    }
+                } header: {
+                    sectionHeader("Cards")
+                }
             }
 
             ForEach(store.org.groups) { group in
@@ -528,6 +542,9 @@ struct PipDriveRow: View {
 
     private var subtitle: String {
         var parts: [String] = []
+        if drive.isCard {
+            return "Card · \(drive.size)"
+        }
         if drive.isConnected {
             parts.append("Connected")
         } else if let date = drive.lastConnected {

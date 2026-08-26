@@ -2,8 +2,9 @@
 
 Keeps an automatic catalogue of external storage drives (USB drives and
 hard drives) that get connected to this Mac, so you can see what lives on
-which drive — and who used it last — without plugging anything in. SD cards
-and mounted app-installer disk images are ignored.
+which drive — and who used it last — without plugging anything in. Memory
+cards and mounted disk images are never catalogued, though a card that is
+plugged in shows up so you can copy files off it.
 
 It comes in two parts that work together:
 
@@ -57,6 +58,24 @@ connected, so they always match reality. Don't store your own files
 inside them — anything you add there gets cleaned away on the next
 connection. Notes are safe as files directly in the drive's folder
 (files are never deleted, only folders are rebuilt).
+
+## Copying off a card
+
+Insert a memory card and it appears under **Cards** in the sidebar — not
+catalogued (cards get reformatted too often to be worth a permanent record),
+just there for as long as it is plugged in. Its folders and files are read
+fresh each time.
+
+**Copy Files…** then lets you pick files and a destination folder on another
+drive. It is deliberately careful:
+
+- nothing is ever removed from the card,
+- a file already at the destination is skipped and listed, never overwritten,
+- every copy's size is checked, and a short copy is deleted rather than left
+  looking valid.
+
+Files land directly in the folder you choose, so pointing it at a project's
+`02_Footage` puts them straight there.
 
 ## New Project
 
@@ -114,6 +133,8 @@ Two things to know:
 
 ## Good to know
 
+- **Cards are never catalogued** — they appear while plugged in and vanish
+  when removed, so the drive list stays a list of real drives.
 - **Two different drives with the same name** (e.g. two cards both
   called "Untitled") are kept apart automatically as "Untitled" and
   "Untitled (2)" — the indexer tells them apart by their volume ID.

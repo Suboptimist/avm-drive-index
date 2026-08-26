@@ -175,6 +175,9 @@ $xamlText = @'
               <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Top">
                 <Button Name="OpenDriveButton" Content="Open Drive"
                         Style="{StaticResource PipButton}" Margin="0,0,8,0"/>
+                <Button Name="CopyFilesButton" Content="Copy Files..."
+                        Style="{StaticResource PipButton}" Margin="0,0,8,0"
+                        ToolTip="Copy chosen files from here onto another drive"/>
                 <Button Name="NewProjectButton" Content="New Project"
                         Style="{StaticResource PipButton}" Margin="0,0,8,0"
                         ToolTip="Create the standard project folder structure on this drive"/>
@@ -302,7 +305,7 @@ try {
 foreach ($name in @('SidebarPanel', 'SearchInput', 'SearchPlaceholder', 'SearchShell',
     'NewFolderButton', 'RescanButton', 'PlaceholderPane', 'PlaceholderTitle', 'PlaceholderBody',
     'DetailPane', 'DetailIndicator', 'DetailName', 'DetailDot', 'DetailStatus',
-    'OpenDriveButton', 'NewProjectButton', 'EjectButton', 'StatSize', 'StatFree',
+    'OpenDriveButton', 'CopyFilesButton', 'NewProjectButton', 'EjectButton', 'StatSize', 'StatFree',
     'StatFormat', 'StatLetter',
     'StatLastConnected', 'StatLastUser', 'UsagePanel', 'UsageBar', 'UsageFill', 'UsageLabel',
     'TabContents', 'TabHistory', 'ContentsTree',
@@ -325,6 +328,7 @@ function New-Brush([string]$Hex) {
 
 $script:BrushGreen     = New-Brush '#4DE680'
 $script:BrushAmber     = New-Brush '#FFBF40'   # nearly-full drives
+$script:BrushRaised    = New-Brush '#1C201D'
 $script:BrushGreenSoft = New-Brush '#D94DE680'
 $script:BrushText      = New-Brush '#E0FFFFFF'
 $script:BrushDim       = New-Brush '#8CFFFFFF'
@@ -356,6 +360,9 @@ function New-Text([string]$Content, [double]$Size, $Brush, [string]$Weight = 'No
 # ---------------------------------------------------------------- state
 
 $script:Records       = @()
+$script:Cards         = @()
+$script:CopyState     = $null
+$script:CopyTimer     = $null
 $script:Org           = Get-Organization
 $script:SelectedName  = $null
 $script:ActiveTab     = 'contents'
@@ -369,6 +376,9 @@ $script:ScanProcess   = $null
 function Get-RecordByName([string]$Name) {
     foreach ($record in $script:Records) {
         if ($record.IndexFolderName -eq $Name) { return $record }
+    }
+    foreach ($card in $script:Cards) {
+        if ($card.IndexFolderName -eq $Name) { return $card }
     }
     return $null
 }
@@ -441,6 +451,34 @@ function Update-Records {
     if (-not $script:SelectedName -and $script:Records.Count -gt 0) {
         $script:SelectedName = $script:Records[0].IndexFolderName
     }
+    # Memory cards are never catalogued, so they are found live and shown only
+    # while they are plugged in.
+    $cards = New-Object System.Collections.ArrayList
+    try {
+        foreach ($card in (Get-CardVolume)) {
+            [void]$cards.Add([pscustomobject]@{
+                IndexFolderName     = $card.Name
+                Name                = $card.Name
+                Letter              = $card.Letter
+                Size                = Format-DriveSize $card.SizeBytes
+                FreeSpace           = Format-FreeSpace $card.FreeBytes $card.SizeBytes
+                UsedPercent         = Get-UsedPercent $card.FreeBytes $card.SizeBytes
+                Format              = $card.FileSystem
+                Serial              = ''
+                LastConnectedString = ''
+                LastConnected       = $null
+                LastUser            = ''
+                ContentsNote        = ''
+                History             = @()
+                FolderPath          = $card.RootPath
+                VolumePath          = $card.RootPath
+                IsConnected         = $true
+                IsCard              = $true
+            })
+        }
+    } catch { }
+    $script:Cards = $cards.ToArray()
+
     $script:IndexStamp = Get-IndexStamp
     $script:VolumeFingerprint = Get-VolumeFingerprint
 }
@@ -523,12 +561,18 @@ function New-DriveRow($Record) {
     $stack.Children.Add($name) | Out-Null
 
     $parts = New-Object System.Collections.Generic.List[string]
-    if ($Record.IsConnected) {
-        $parts.Add('Connected') | Out-Null
-    } elseif ($Record.LastConnected) {
-        $parts.Add((Get-RelativeTimeText $Record.LastConnected)) | Out-Null
+    if ($Record.IsCard) {
+        # A card carries no history, so say what it is and how big it is.
+        $parts.Add('Card') | Out-Null
+        if ($Record.Size) { $parts.Add($Record.Size) | Out-Null }
+    } else {
+        if ($Record.IsConnected) {
+            $parts.Add('Connected') | Out-Null
+        } elseif ($Record.LastConnected) {
+            $parts.Add((Get-RelativeTimeText $Record.LastConnected)) | Out-Null
+        }
+        if ($Record.LastUser) { $parts.Add($Record.LastUser) | Out-Null }
     }
-    if ($Record.LastUser) { $parts.Add($Record.LastUser) | Out-Null }
     $subtitleBrush = $script:BrushDim
     if ($Record.IsConnected) { $subtitleBrush = $script:BrushGreenSoft }
     $subtitle = New-Text ($parts -join '  |  ') 10.5 $subtitleBrush
@@ -569,6 +613,13 @@ function New-MenuItem([string]$Header, $Tag, [scriptblock]$OnClick) {
 function New-DriveContextMenu($Record) {
     $menu = New-Object System.Windows.Controls.ContextMenu
     $driveName = $Record.IndexFolderName
+
+    if ($Record.IsCard) {
+        # A card is not catalogued, so folders and removal do not apply to it.
+        $menu.Items.Add((New-MenuItem 'Copy Files...' $driveName { Copy-FilesFromVolume $this.Tag })) | Out-Null
+        $menu.Items.Add((New-MenuItem 'Eject' $driveName { Invoke-Eject $this.Tag })) | Out-Null
+        return $menu
+    }
 
     if ($Record.IsConnected) {
         $menu.Items.Add((New-MenuItem 'Eject' $driveName { Invoke-Eject $this.Tag })) | Out-Null
@@ -632,6 +683,13 @@ function Build-Sidebar {
     foreach ($name in $script:Org.ungrouped) {
         $record = Get-RecordByName $name
         if ($record) { $script:SidebarPanel.Children.Add((New-DriveRow $record)) | Out-Null }
+    }
+
+    if ($script:Cards.Count -gt 0) {
+        $script:SidebarPanel.Children.Add((New-SectionHeader 'Cards')) | Out-Null
+        foreach ($card in $script:Cards) {
+            $script:SidebarPanel.Children.Add((New-DriveRow $card)) | Out-Null
+        }
     }
 
     foreach ($group in $script:Org.groups) {
@@ -701,14 +759,17 @@ function Show-Detail {
         $script:DetailStatus.Text = 'Connected'
         $script:DetailStatus.Foreground = $script:BrushGreen
         $script:OpenDriveButton.Visibility = 'Visible'
-        $script:NewProjectButton.Visibility = 'Visible'
+        $script:CopyFilesButton.Visibility = 'Visible'
         $script:EjectButton.Visibility = 'Visible'
+        if ($record.IsCard) { $script:NewProjectButton.Visibility = 'Collapsed' }
+        else { $script:NewProjectButton.Visibility = 'Visible' }
     } else {
         $script:DetailIndicator.Background = $script:BrushGrey
         $script:DetailDot.Visibility = 'Collapsed'
         $script:DetailStatus.Text = 'Not connected'
         $script:DetailStatus.Foreground = $script:BrushDim
         $script:OpenDriveButton.Visibility = 'Collapsed'
+        $script:CopyFilesButton.Visibility = 'Collapsed'
         $script:NewProjectButton.Visibility = 'Collapsed'
         $script:EjectButton.Visibility = 'Collapsed'
     }
@@ -737,8 +798,17 @@ function Show-Detail {
     $script:StatFree.Text          = 'Free space'.PadRight(16) + $freeText
     $script:StatFormat.Text        = 'Format'.PadRight(16) + (Get-Value $record.Format)
     $script:StatLetter.Text        = 'Drive letter'.PadRight(16) + (Get-Value $record.Letter)
-    $script:StatLastConnected.Text = 'Last connected'.PadRight(16) + $lastConnected
-    $script:StatLastUser.Text      = 'Last used by'.PadRight(16) + (Get-Value $record.LastUser)
+    if ($record.IsCard) {
+        $script:StatLastConnected.Text = 'Kind'.PadRight(16) + 'Memory card -- not catalogued'
+        $script:StatLastUser.Visibility = 'Collapsed'
+        $script:TabHistory.Visibility = 'Collapsed'
+        if ($script:ActiveTab -eq 'history') { $script:ActiveTab = 'contents' }
+    } else {
+        $script:StatLastConnected.Text = 'Last connected'.PadRight(16) + $lastConnected
+        $script:StatLastUser.Text      = 'Last used by'.PadRight(16) + (Get-Value $record.LastUser)
+        $script:StatLastUser.Visibility = 'Visible'
+        $script:TabHistory.Visibility = 'Visible'
+    }
 
     # Usage bar: two star-sized columns, so it scales with the window.
     $used = 0
@@ -802,7 +872,8 @@ function Build-ContentsTree($Record) {
         $previousCursor = $window.Cursor
         $window.Cursor = [System.Windows.Input.Cursors]::Wait
         try {
-            $tree = Get-DriveContentTree $Record.FolderPath
+            if ($Record.IsCard) { $tree = Get-LiveContentTree $Record.VolumePath }
+            else { $tree = Get-DriveContentTree $Record.FolderPath }
             $script:TreeCache[$Record.FolderPath] = $tree
         } finally {
             $window.Cursor = $previousCursor
@@ -1229,6 +1300,136 @@ function Invoke-Rescan {
     }
 }
 
+function Copy-FilesFromVolume([string]$Name) {
+    if ($script:CopyState) { return }        # one copy at a time
+    $record = $null
+    if ($Name) { $record = Get-RecordByName $Name } else { $record = Get-SelectedRecord }
+    if (-not $record -or -not $record.VolumePath) { return }
+
+    # Which files. The standard Windows picker is used on purpose: it already
+    # does multi-select, previews and type filtering far better than a list
+    # built by hand here.
+    $dialog = New-Object Microsoft.Win32.OpenFileDialog
+    $dialog.Multiselect = $true
+    $dialog.Title = "Choose files to copy from $($record.IndexFolderName)"
+    $start = $record.VolumePath
+    $dcim = Join-Path $record.VolumePath 'DCIM'
+    if (Test-Path -LiteralPath $dcim) { $start = $dcim }
+    $dialog.InitialDirectory = $start
+    if ($dialog.ShowDialog() -ne $true) { return }
+    $files = @($dialog.FileNames)
+    if ($files.Count -eq 0) { return }
+
+    # Where they go. Start the picker on another drive that is plugged in.
+    $suggested = $record.VolumePath
+    foreach ($other in $script:Records) {
+        if ($other.VolumePath -and $other.IndexFolderName -ne $record.IndexFolderName) {
+            $suggested = $other.VolumePath; break
+        }
+    }
+    $destination = $null
+    try {
+        $shell = New-Object -ComObject Shell.Application
+        $chosen = $shell.BrowseForFolder(0, 'Where should these files go?', 0, $suggested)
+        if (-not $chosen) { return }
+        $destination = $chosen.Self.Path
+    } catch {
+        [System.Windows.MessageBox]::Show(
+            "A folder could not be chosen.`r`n`r`n$($_.Exception.Message)", 'Copy Files') | Out-Null
+        return
+    }
+    if (-not $destination) { return }
+    Start-CopyJob $files $destination $record.IndexFolderName
+}
+
+function Start-CopyJob($Files, [string]$Destination, [string]$SourceName) {
+    # Files are copied one per timer tick rather than in a tight loop, so the
+    # window keeps painting and Stop stays responsive.
+    $progress = New-Object System.Windows.Window
+    $progress.Title = 'Copying'
+    $progress.Width = 500
+    $progress.SizeToContent = 'Height'
+    $progress.ResizeMode = 'NoResize'
+    $progress.WindowStartupLocation = 'CenterOwner'
+    try { $progress.Owner = $window } catch { }
+    $progress.Background = $script:BrushRaised
+
+    $panel = New-Object System.Windows.Controls.StackPanel
+    $panel.Margin = '18'
+    $panel.Children.Add((New-Text "Copying from $SourceName" 14 $script:BrushText 'Bold' 'Consolas')) | Out-Null
+    $status = New-Text '' 11.5 $script:BrushDim
+    $status.Margin = '0,10,0,8'
+    $panel.Children.Add($status) | Out-Null
+    $bar = New-Object System.Windows.Controls.ProgressBar
+    $bar.Height = 8
+    $bar.Minimum = 0
+    $bar.Maximum = $Files.Count
+    $bar.Foreground = $script:BrushGreen
+    $bar.Background = $script:BrushFaint
+    $panel.Children.Add($bar) | Out-Null
+    $stop = New-Object System.Windows.Controls.Button
+    $stop.Content = 'Stop'
+    $stop.HorizontalAlignment = 'Right'
+    $stop.Margin = '0,14,0,0'
+    try { $stop.Style = $window.FindResource('PipButton') } catch { }
+    $stop.add_Click({ if ($script:CopyState) { $script:CopyState.Cancelled = $true } })
+    $panel.Children.Add($stop) | Out-Null
+    $progress.Content = $panel
+
+    $script:CopyState = [pscustomobject]@{
+        Files = $Files; Destination = $Destination; SourceName = $SourceName
+        Index = 0; Copied = 0; Skipped = 0
+        Failed = (New-Object System.Collections.ArrayList)
+        Bar = $bar; Status = $status; Window = $progress; Cancelled = $false
+    }
+    $script:CopyTimer = New-Object System.Windows.Threading.DispatcherTimer
+    $script:CopyTimer.Interval = [TimeSpan]::FromMilliseconds(1)
+    $script:CopyTimer.add_Tick({ Step-CopyJob })
+    $script:CopyTimer.Start()
+    $progress.ShowDialog() | Out-Null      # the timer keeps ticking inside this
+}
+
+function Step-CopyJob {
+    $state = $script:CopyState
+    if (-not $state) { $script:CopyTimer.Stop(); return }
+    if ($state.Cancelled -or $state.Index -ge $state.Files.Count) {
+        $script:CopyTimer.Stop()
+        Complete-CopyJob
+        return
+    }
+    $path = $state.Files[$state.Index]
+    $state.Index = $state.Index + 1
+    $name = [System.IO.Path]::GetFileName($path)
+    $state.Status.Text = "$name   ($($state.Index) of $($state.Files.Count))"
+    $state.Bar.Value = $state.Index
+
+    $result = Copy-OneFile $path $state.Destination
+    if ($result.Status -eq 'copied') { $state.Copied = $state.Copied + 1 }
+    elseif ($result.Status -eq 'skipped') { $state.Skipped = $state.Skipped + 1 }
+    else { [void]$state.Failed.Add("$name -- $($result.Error)") }
+}
+
+function Complete-CopyJob {
+    $state = $script:CopyState
+    if (-not $state) { return }
+    $script:CopyState = $null
+    try { $state.Window.Close() } catch { }
+
+    $lines = New-Object System.Collections.ArrayList
+    [void]$lines.Add("$($state.Copied) copied into $($state.Destination)")
+    if ($state.Skipped -gt 0) {
+        [void]$lines.Add("$($state.Skipped) skipped -- a file of that name was already there")
+    }
+    if ($state.Failed.Count -gt 0) {
+        [void]$lines.Add("$($state.Failed.Count) failed:")
+        foreach ($failure in $state.Failed) { [void]$lines.Add("  $failure") }
+    }
+    if ($state.Cancelled) { [void]$lines.Add('Stopped before the end.') }
+    [void]$lines.Add("Nothing was removed from $($state.SourceName).")
+    [System.Windows.MessageBox]::Show(($lines.ToArray() -join "`r`n"), 'Copy Files') | Out-Null
+    Invoke-Rescan
+}
+
 function New-DriveProject {
     $record = Get-SelectedRecord
     if (-not $record -or -not $record.VolumePath) { return }
@@ -1287,6 +1488,8 @@ function Update-WatcherBanner {
 $script:RescanButton.add_Click({ Invoke-Rescan })
 
 $script:NewFolderButton.add_Click({ New-DriveFolder $null })
+
+$script:CopyFilesButton.add_Click({ Copy-FilesFromVolume $null })
 
 $script:NewProjectButton.add_Click({ New-DriveProject })
 

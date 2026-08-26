@@ -33,6 +33,7 @@ struct DriveRecord: Identifiable, Hashable {
     let folderURL: URL            // the drive's folder inside the index
     let volumeURL: URL?           // where the drive is mounted right now, if it is
     let isCard: Bool              // a memory card: shown while mounted, never catalogued
+    let isRemovableMedia: Bool    // a card, stick, recorder — something you offload from
     let folderTree: [FolderNode]
 
     var isConnected: Bool { volumeURL != nil }
@@ -51,7 +52,9 @@ enum InfoFileParser {
 
     /// Parses one "_DRIVE INFO.txt" written by drive_indexer.sh.
     /// `mountedVolume` maps (uuid, name) to the live mount point, if any.
-    static func parse(infoFile: URL, folderURL: URL, mountedVolume: (String?, String) -> URL?) -> DriveRecord? {
+    static func parse(infoFile: URL, folderURL: URL,
+                      mountedVolume: (String?, String) -> URL?,
+                      isRemovable: (URL) -> Bool = { _ in false }) -> DriveRecord? {
         guard let text = try? String(contentsOf: infoFile, encoding: .utf8) else { return nil }
 
         func field(_ label: String) -> String {
@@ -86,6 +89,7 @@ enum InfoFileParser {
         }
 
         let lastConnectedString = field("LAST CONNECTED:")
+        let volume = mountedVolume(uuid, name)
         return DriveRecord(
             id: folderURL.path,
             indexFolderName: folderURL.lastPathComponent,
@@ -101,8 +105,9 @@ enum InfoFileParser {
             foldersNote: contentsNote,
             history: history,
             folderURL: folderURL,
-            volumeURL: mountedVolume(uuid, name),
+            volumeURL: volume,
             isCard: false,
+            isRemovableMedia: volume.map(isRemovable) ?? false,
             folderTree: contentTree(at: folderURL)
         )
     }

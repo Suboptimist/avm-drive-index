@@ -78,7 +78,8 @@ it's plain folders and text files, so nothing is locked inside the app.
   individual files, then copy them into a folder on another drive. A file
   ticked on its own lands straight in the chosen folder; a folder you tick is
   recreated at the destination with its contents inside. The button is at the
-  top for a card and in the right-click menu for an ordinary drive. Nothing is
+  top for anything you offload from — a card, a stick, a recorder — and in the
+  right-click menu for fixed archive drives. Nothing is
   removed from the source, files already at the destination are skipped rather
   than overwritten, and every copy's size is checked.
 - **New Project** — creates the standard project folder layout on the drive

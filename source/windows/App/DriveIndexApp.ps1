@@ -439,6 +439,7 @@ function Update-Records {
             $record.IsConnected = $true
             $record.VolumePath  = $match.RootPath
             $record.Letter      = $match.Letter
+            $record.IsRemovableMedia = $match.IsRemovableMedia
         }
     }
 
@@ -482,6 +483,7 @@ function Update-Records {
                 VolumePath          = $card.RootPath
                 IsConnected         = $true
                 IsCard              = $true
+                IsRemovableMedia    = $true
             })
         }
     } catch { }
@@ -769,15 +771,13 @@ function Show-Detail {
         $script:DetailStatus.Foreground = $script:BrushGreen
         $script:OpenDriveButton.Visibility = 'Visible'
         $script:EjectButton.Visibility = 'Visible'
-        # Copying is what a card is for, so it stays up here. On a drive it is
-        # a rarer job and lives in the right-click menu instead.
-        if ($record.IsCard) {
-            $script:CopyFilesButton.Visibility = 'Visible'
-            $script:NewProjectButton.Visibility = 'Collapsed'
-        } else {
-            $script:CopyFilesButton.Visibility = 'Collapsed'
-            $script:NewProjectButton.Visibility = 'Visible'
-        }
+        # Anything you offload from -- a card, a stick, a recorder -- gets Copy
+        # up here. A fixed archive drive keeps it in the right-click menu, out
+        # of the way of the job you usually came to do.
+        if ($record.IsRemovableMedia) { $script:CopyFilesButton.Visibility = 'Visible' }
+        else { $script:CopyFilesButton.Visibility = 'Collapsed' }
+        if ($record.IsCard) { $script:NewProjectButton.Visibility = 'Collapsed' }
+        else { $script:NewProjectButton.Visibility = 'Visible' }
     } else {
         $script:DetailIndicator.Background = $script:BrushGrey
         $script:DetailDot.Visibility = 'Collapsed'

@@ -66,8 +66,10 @@ catalogued (cards get reformatted too often to be worth a permanent record),
 just there for as long as it is plugged in. Its folders and files are read
 fresh each time.
 
-**Copy Files…** sits at the top for a card, and in the right-click menu for an
-ordinary drive (copying off a drive is the rarer job).
+**Copy Files…** sits at the top for anything you offload from — a memory card,
+a USB stick, a field recorder, a mic — that is, any volume the system reports
+as *removable media*. A fixed archive drive keeps it in the right-click menu
+instead, out of the way of the job you usually came to do.
 
 You browse the card as a folder tree: open a folder to tick individual files,
 or tick the folder itself to take everything in it. What you tick decides where

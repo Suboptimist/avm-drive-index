@@ -119,14 +119,19 @@ final class IndexStore: ObservableObject {
         // What is actually mounted right now (ground truth, straight from
         // the system — never stale).
         var mounted: [(url: URL, name: String, uuid: String?)] = []
+        var removableByPath: [String: Bool] = [:]
         for entry in (try? fm.contentsOfDirectory(atPath: "/Volumes")) ?? [] {
             let url = URL(fileURLWithPath: "/Volumes").appendingPathComponent(entry)
             if (try? url.resourceValues(forKeys: [.isSymbolicLinkKey]))?.isSymbolicLink == true {
                 continue   // skip the "Macintosh HD" symlink to /
             }
-            let vals = try? url.resourceValues(forKeys: [.volumeUUIDStringKey, .isVolumeKey])
+            let vals = try? url.resourceValues(forKeys: [
+                .volumeUUIDStringKey, .isVolumeKey, .volumeIsRemovableKey])
             guard vals?.isVolume == true else { continue }   // ignore leftover empty mount-point folders
             mounted.append((url, entry, vals?.volumeUUIDString))
+            // Removable media (a card, a stick, a recorder) is something you
+            // offload from; an archive SSD reports as fixed.
+            removableByPath[url.path] = vals?.volumeIsRemovable ?? false
         }
         func mountedVolume(uuid: String?, name: String) -> URL? {
             if let uuid,
@@ -143,7 +148,9 @@ final class IndexStore: ObservableObject {
         for folder in folders {
             let info = folder.appendingPathComponent("_DRIVE INFO.txt")
             guard fm.fileExists(atPath: info.path),
-                  let record = InfoFileParser.parse(infoFile: info, folderURL: folder, mountedVolume: mountedVolume)
+                  let record = InfoFileParser.parse(
+                      infoFile: info, folderURL: folder, mountedVolume: mountedVolume,
+                      isRemovable: { removableByPath[$0.path] ?? false })
             else { continue }
             records.append(record)
         }
@@ -185,6 +192,7 @@ final class IndexStore: ObservableObject {
                 folderURL: card.url,
                 volumeURL: card.url,
                 isCard: true,
+                isRemovableMedia: true,
                 folderTree: cached.tree))
         }
         cards = records

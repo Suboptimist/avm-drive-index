@@ -234,6 +234,7 @@ function Read-DriveRecord([string]$FolderPath) {
         History             = $history.ToArray()
         FolderPath          = $FolderPath
         IsCard              = $false
+        IsRemovableMedia    = $false     # filled in by the caller
         IsConnected         = $false     # filled in by the caller
         VolumePath          = $null      # filled in by the caller
     }
@@ -489,6 +490,9 @@ function Get-AttachedVolume {
             SizeBytes  = [long]$logical.Size
             FreeBytes  = [long]$logical.FreeSpace
             IsCard     = $isCard
+            # DriveType 2 is removable media: a card, a stick, a recorder --
+            # something you offload from. An archive SSD reports as 3 (fixed).
+            IsRemovableMedia = ($logical.DriveType -eq 2)
         }
     }
 }

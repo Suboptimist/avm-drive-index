@@ -5,6 +5,7 @@ import SwiftUI
 /// and hairlines.
 enum Pip {
     static let green    = Color(red: 0.30, green: 0.90, blue: 0.50)
+    static let amber    = Color(red: 1.00, green: 0.75, blue: 0.25)   // nearly-full drives
     static let text     = Color.white.opacity(0.88)
     static let dim      = Color.white.opacity(0.55)
     static let faint    = Color.white.opacity(0.14)

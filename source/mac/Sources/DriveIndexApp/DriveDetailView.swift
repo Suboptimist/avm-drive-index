@@ -86,7 +86,7 @@ struct DriveDetailView: View {
                         RoundedRectangle(cornerRadius: 3.5)
                             .fill(Pip.faint)
                         RoundedRectangle(cornerRadius: 3.5)
-                            .fill(Pip.green)
+                            .fill(used >= 90 ? Pip.amber : Pip.green)
                             .frame(width: max(2, geo.size.width * CGFloat(used) / 100))
                             .pipGlow(drive.isConnected ? 0.5 : 0)
                     }
@@ -94,7 +94,7 @@ struct DriveDetailView: View {
                 .frame(width: 300, height: 7)
                 Text("\(used)% used")
                     .font(.system(size: 11, design: .monospaced))
-                    .foregroundStyle(Pip.dim)
+                    .foregroundStyle(used >= 90 ? Pip.amber : Pip.dim)
             }
             .padding(.top, 5)
         }

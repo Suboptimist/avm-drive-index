@@ -194,7 +194,7 @@ $xamlText = @'
                       <ColumnDefinition Width="0*"/>
                       <ColumnDefinition Width="100*"/>
                     </Grid.ColumnDefinitions>
-                    <Border Grid.Column="0" Background="#4DE680" CornerRadius="3"/>
+                    <Border Name="UsageFill" Grid.Column="0" Background="#4DE680" CornerRadius="3"/>
                   </Grid>
                 </Border>
                 <TextBlock Name="UsageLabel" FontFamily="Consolas" FontSize="11"
@@ -300,7 +300,7 @@ foreach ($name in @('SidebarPanel', 'SearchInput', 'SearchPlaceholder', 'SearchS
     'NewFolderButton', 'RescanButton', 'PlaceholderPane', 'PlaceholderTitle', 'PlaceholderBody',
     'DetailPane', 'DetailIndicator', 'DetailName', 'DetailDot', 'DetailStatus',
     'OpenDriveButton', 'EjectButton', 'StatSize', 'StatFree', 'StatFormat', 'StatLetter',
-    'StatLastConnected', 'StatLastUser', 'UsagePanel', 'UsageBar', 'UsageLabel',
+    'StatLastConnected', 'StatLastUser', 'UsagePanel', 'UsageBar', 'UsageFill', 'UsageLabel',
     'TabContents', 'TabHistory', 'ContentsTree',
     'HistoryScroll', 'HistoryPanel', 'TabPlaceholder', 'ContentsNote', 'SearchPane',
     'SearchSummary', 'SearchResultsPanel', 'WatcherBanner', 'TurnOnButton')) {
@@ -320,6 +320,7 @@ function New-Brush([string]$Hex) {
 }
 
 $script:BrushGreen     = New-Brush '#4DE680'
+$script:BrushAmber     = New-Brush '#FFBF40'   # nearly-full drives
 $script:BrushGreenSoft = New-Brush '#D94DE680'
 $script:BrushText      = New-Brush '#E0FFFFFF'
 $script:BrushDim       = New-Brush '#8CFFFFFF'
@@ -741,6 +742,14 @@ function Show-Detail {
             New-Object System.Windows.GridLength ($used, 'Star')
         $script:UsageBar.ColumnDefinitions[1].Width =
             New-Object System.Windows.GridLength ((100 - $used), 'Star')
+        # Amber past 90% so a nearly-full drive stands out.
+        if ($used -ge 90) {
+            $script:UsageFill.Background = $script:BrushAmber
+            $script:UsageLabel.Foreground = $script:BrushAmber
+        } else {
+            $script:UsageFill.Background = $script:BrushGreen
+            $script:UsageLabel.Foreground = $script:BrushDim
+        }
         $script:UsageLabel.Text = "$used% used"
         $script:UsagePanel.Visibility = 'Visible'
     } else {

@@ -24,8 +24,8 @@ This keeps a searchable index of all of them, so you don't have to.
 - **Remembers folders *and* files**, with sizes, so you can browse a drive
   that's sitting in a drawer on the other side of the building.
 - **Shows how much room is left** — free space alongside total size, plus a
-  bar showing how full the drive is, so you know which drive to reach for
-  before you unplug anything.
+  bar showing how full the drive is (amber past 90%), so you know which drive
+  to reach for before you unplug anything.
 - **Records who used it last** — the user account signed in each time the
   drive was connected, with a full connection history.
 - **Searches everything at once** — drive names, folder names and file names
@@ -90,6 +90,12 @@ Then open the app normally.
 macOS may ask whether the app can **access files on a removable volume**.
 Click **Allow** — it reads folder and file *names* so it can catalogue them.
 It never reads file contents, and nothing is sent anywhere.
+
+If a drive's folders and files come up empty, that permission is the reason.
+Open the app with the drive connected, press **Rescan**, and approve the
+prompt — or switch on **AVM Drive Index** under System Settings → Privacy &
+Security → Files and Folders. A drive's size, free space and history are
+recorded either way; only the folder and file listing needs the permission.
 
 ---
 

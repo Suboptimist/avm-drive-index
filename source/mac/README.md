@@ -105,13 +105,32 @@ Two things to know:
 - **Running a scan by hand:** you never need to, but running
   `drive_indexer.sh` (or reinstalling) re-scans whatever is currently
   connected and updates the private index.
+- **If a drive's folders and files come up empty**, macOS has not granted the
+  app access to external drives yet. Open the app with the drive connected and
+  press **Rescan** — approve the prompt, or switch on **AVM Drive Index**
+  under System Settings → Privacy & Security → Files and Folders (Removable
+  Volumes). Everything else about the drive is recorded either way.
 
 ## How it works (for the curious)
 
 `Install Drive Indexer.command` creates a standard macOS LaunchAgent
-(`~/Library/LaunchAgents/com.avm.drive-indexer.plist`) that
-watches the system's `/Volumes` folder. Whenever a drive appears or
-disappears, macOS runs `drive_indexer.sh`, which uses `diskutil` to spot
-external storage volumes, skips SD cards and mounted disk images, mirrors
-their folder tree, and updates the info files. No third-party software,
-nothing phoning home, and it uses essentially zero resources while idle.
+(`~/Library/LaunchAgents/com.avm.drive-indexer.plist`) that watches the
+system's `/Volumes` folder. Whenever a drive appears or disappears, macOS
+launches the app with `--scan`, which runs one pass of `drive_indexer.sh` and
+exits without opening a window. The script uses `diskutil` to spot external
+storage volumes, skips SD cards and mounted disk images, mirrors their folder
+tree, and updates the info files.
+
+Scanning goes through the app rather than running the script straight from
+bash for a specific reason: macOS grants file access per identifiable
+application. The app can be given access to external drives in **System
+Settings → Privacy & Security**; a bare shell cannot, which used to leave
+folder and file listings empty ("could not read this drive's contents") even
+though size, free space and history worked.
+
+The scanner is copied into the index folder so background scanning survives
+the app being moved, and the app refreshes that copy whenever they differ, so
+an update reaches background scans too.
+
+No third-party software, nothing phoning home, and it uses essentially zero
+resources while idle.

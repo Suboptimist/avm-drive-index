@@ -17,6 +17,17 @@ LABEL="com.avm.drive-indexer"
 PLIST="$HOME/Library/LaunchAgents/$LABEL.plist"
 LOG_DIR="$INDEX_DIR/Logs"
 
+# Prefer launching the app itself to do the scanning. macOS attributes drive
+# access to whatever it can identify: the app can be granted access to external
+# drives in System Settings, a bare shell cannot. Falls back to running the
+# script directly when the installer is used from the source folder, where
+# there is no app bundle to launch.
+APP_BINARY=""
+CANDIDATE="$APP_DIR/../../MacOS/DriveIndexApp"
+if [ -x "$CANDIDATE" ]; then
+    APP_BINARY="$(cd "$(dirname "$CANDIDATE")" && pwd)/$(basename "$CANDIDATE")"
+fi
+
 echo ""
 echo "Setting up the Drive Indexer..."
 echo ""
@@ -39,6 +50,17 @@ fi
 cp "$SOURCE_SCRIPT" "$SCRIPT"
 chmod +x "$SCRIPT"
 
+if [ -n "$APP_BINARY" ]; then
+    PROGRAM_ARGUMENTS="        <string>$APP_BINARY</string>
+        <string>--scan</string>"
+    echo "  Scanning as       : AVM Drive Index.app (so macOS can grant it drive access)"
+else
+    PROGRAM_ARGUMENTS="        <string>/bin/bash</string>
+        <string>$SCRIPT</string>"
+    echo "  Scanning as       : /bin/bash (no app bundle found next to this installer)"
+fi
+echo ""
+
 cat > "$PLIST" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -48,8 +70,7 @@ cat > "$PLIST" <<PLIST
     <string>$LABEL</string>
     <key>ProgramArguments</key>
     <array>
-        <string>/bin/bash</string>
-        <string>$SCRIPT</string>
+$PROGRAM_ARGUMENTS
     </array>
     <key>EnvironmentVariables</key>
     <dict>
@@ -84,7 +105,14 @@ echo ""
 echo "From now on, every external drive you connect will show up in:"
 echo "  $INDEX_DIR/Drives"
 echo ""
-echo "If macOS asks whether it may access files on a removable volume,"
-echo "click Allow — that's the indexer reading the drive's folder names."
+if [ -n "$APP_BINARY" ]; then
+    echo "One more step, once: open AVM Drive Index and press Rescan with a drive"
+    echo "connected. macOS will ask whether the app may access files on a"
+    echo "removable volume — click Allow. Without that, drives are still listed"
+    echo "but their folders and files cannot be read."
+else
+    echo "If macOS asks whether it may access files on a removable volume,"
+    echo "click Allow — that's the indexer reading the drive's folder names."
+fi
 echo ""
 echo "You can close this window."

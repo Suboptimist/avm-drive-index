@@ -54,23 +54,8 @@ final class IndexStore: ObservableObject {
     /// refreshed whenever the app is updated, otherwise an updated app would go
     /// on running the scanner it shipped with originally.
     private func syncIndexerScript() {
-        guard let root = indexFolder,
-              let bundled = Bundle.main.resourceURL?
-                .appendingPathComponent("Drive Indexer Support/drive_indexer.sh"),
-              let shipped = try? Data(contentsOf: bundled)
-        else { return }
-
-        let fm = FileManager.default
-        guard fm.fileExists(atPath: root.path) else { return }   // not installed yet
-        let installed = root.appendingPathComponent("drive_indexer.sh")
-        if let current = try? Data(contentsOf: installed), current == shipped { return }
-
-        do {
-            try shipped.write(to: installed)
-            try fm.setAttributes([.posixPermissions: 0o755], ofItemAtPath: installed.path)
-        } catch {
-            // Not fatal: the previous scanner stays in place.
-        }
+        guard let root = indexFolder else { return }
+        ScanSupport.syncScript(into: root)
     }
 
     // MARK: - Finding the Drive Index folder

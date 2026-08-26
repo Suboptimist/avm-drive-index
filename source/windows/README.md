@@ -66,7 +66,7 @@ it's plain folders and text files, so nothing is locked inside the app.
   "2 hours ago" and who used it.
 - **Free space** — how much room was left the last time the drive was
   plugged in, shown next to its total size, with a bar showing how full the
-  drive is.
+  drive is. The bar turns amber past 90% so a nearly-full drive stands out.
 - **Contents** — the drive's folders and files with sizes, browsable even when
   the drive is nowhere near you.
 - **History** — every connection, with the date and the Windows account that

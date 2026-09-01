@@ -52,9 +52,26 @@ chmod +x "$DEST_DIR/$APP_BUNDLE/Contents/MacOS/$EXECUTABLE_NAME"
 # account needed.
 codesign --force --deep --sign - "$DEST_DIR/$APP_BUNDLE"
 
+# If a copy is already installed in Applications, that is the one that gets
+# opened day to day — refresh it too, otherwise a rebuild looks like it did
+# nothing.
+INSTALLED="/Applications/$APP_BUNDLE"
+if [ -d "$INSTALLED" ]; then
+  echo "Updating the copy in Applications..."
+  osascript -e "tell application \"$APP_DISPLAY_NAME\" to quit" >/dev/null 2>&1 || true
+  sleep 1
+  rm -rf "$INSTALLED"
+  cp -R "$DEST_DIR/$APP_BUNDLE" "$INSTALLED"
+  codesign --force --deep --sign - "$INSTALLED"
+fi
+
 echo ""
 echo "Done!"
-echo "\"$APP_BUNDLE\" is ready in the Drive Index folder — double-click it to open."
+if [ -d "$INSTALLED" ]; then
+  echo "\"$APP_BUNDLE\" is updated in Applications and in the Drive Index folder."
+else
+  echo "\"$APP_BUNDLE\" is ready in the Drive Index folder — double-click it to open."
+fi
 echo ""
 open "$DEST_DIR"
 read -p "Press Enter to close this window..."

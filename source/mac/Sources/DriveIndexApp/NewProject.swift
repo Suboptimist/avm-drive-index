@@ -17,7 +17,7 @@ struct NewProjectSheet: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            Text("New Project")
+            Text("New Project Folder")
                 .font(.system(size: 16, weight: .bold, design: .monospaced))
                 .foregroundStyle(Pip.text)
 

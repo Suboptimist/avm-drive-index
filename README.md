@@ -43,30 +43,39 @@ This keeps a searchable index of all of them, so you don't have to.
 |---|---|
 | ![Connection history](screenshots/02-history.png) | ![Search results](screenshots/03-search.png) |
 
-## Copying off a card
+## Copying between drives
 
-Insert a memory card and it appears under **Cards** in the sidebar. Cards are
-never catalogued — they get reformatted far too often to be worth a permanent
-record — they are simply there while plugged in, with their contents read
-fresh.
+Any connected drive can be a source. Insert a memory card and it appears under
+**Cards** in the sidebar — cards are never catalogued, they get reformatted far
+too often to be worth a permanent record, so they are simply there while
+plugged in with their contents read fresh.
 
-![Choosing files to copy from a card](screenshots/05-copy.png)
+![Choosing what to copy from one drive onto another](screenshots/05-copy.png)
 
-**Copy Files…** sits at the top for anything you offload from — a memory card,
-a USB stick, a field recorder, a mic — that is, any volume the system reports
-as *removable media*. A fixed archive drive keeps it in the right-click menu
-instead, out of the way of the job you usually came to do.
+**Copy Files…** works from any connected drive, not just cards — pick things
+off one drive and put them on another. Where the button sits depends on what
+you plugged in:
 
-You browse the card as a folder tree: open a folder to tick individual files,
+- **Anything you offload from** — a memory card, a USB stick, a field recorder,
+  a mic; that is, any volume the system reports as *removable media* — gets it
+  in the header, next to Open Drive. Emptying the thing is why you plugged it
+  in.
+- **A fixed drive** gets it beside the **Contents** and **History** tabs, where
+  it belongs to the contents you are looking at rather than crowding the
+  header. It is also in the drive's right-click menu.
+
+You browse the drive as a folder tree: open a folder to tick individual files,
 or tick the folder itself to take everything in it. What you tick decides where
 things land — **a file ticked on its own goes straight into the folder you
 chose, and a folder you tick is recreated at the destination with its contents
-inside**. So ticking `100MSDCF` puts a `100MSDCF` folder in your project, while
-ticking three clips inside it drops just those three clips in.
+inside**. So ticking `Spring Campaign` puts a `Spring Campaign` folder at the
+destination, while ticking one clip inside `Exports` drops just that clip in.
+
+A big drive takes a moment to read; the window stays usable while it does.
 
 It is deliberately careful with footage:
 
-- nothing is ever removed from the card,
+- nothing is ever removed from the source,
 - a file already at the destination is skipped and listed, never overwritten,
 - every copy's size is checked, and a short copy is deleted rather than left
   sitting there looking valid.
@@ -74,10 +83,10 @@ It is deliberately careful with footage:
 Point it at a project's `02_Footage` and that is exactly where the clips end
 up.
 
-## New Project
+## New Project Folder
 
-With a drive connected, **New Project** creates a consistent folder layout on
-it — no more building the same tree by hand for every job:
+With a drive connected, **New Project Folder** creates a consistent folder
+layout on it — no more building the same tree by hand for every job:
 
 ```
 <Project name>/
@@ -189,6 +198,22 @@ company policy. The launchers already ask Windows to permit only these files,
 but if policy forbids even that, an IT administrator has to allow it.
 
 ---
+
+## Staying up to date
+
+Both apps check for a new version once a day and stay quiet unless there is
+one. When there is, they download it, replace themselves and reopen — your
+catalogue is never touched.
+
+- **Mac** — menu bar → **AVM Drive Index → Check for Updates…**
+- **Windows** — the **version button** in the top-right corner of the window
+
+The repository is public, so the check is an ordinary unauthenticated request:
+no key ships inside either app, and nothing about you is sent anywhere.
+
+An update only reaches you if the copy you are running already knows how to
+look for one, which starts with version 1.7. Anything older has to be replaced
+once by hand from the downloads above.
 
 ## Where your catalogue lives
 

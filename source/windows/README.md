@@ -74,15 +74,16 @@ it's plain folders and text files, so nothing is locked inside the app.
 - **Search** (or press **Ctrl+F**) — searches the *entire* index: drive names,
   folder names, and file names across every drive ever connected. Click a
   result to jump to its drive; press Esc to clear.
-- **Copy Files…** — browse a card as a folder tree and tick whole folders or
-  individual files, then copy them into a folder on another drive. A file
-  ticked on its own lands straight in the chosen folder; a folder you tick is
-  recreated at the destination with its contents inside. The button is at the
-  top for anything you offload from — a card, a stick, a recorder — and in the
-  right-click menu for fixed archive drives. Nothing is
-  removed from the source, files already at the destination are skipped rather
-  than overwritten, and every copy's size is checked.
-- **New Project** — creates the standard project folder layout on the drive
+- **Copy Files…** — browse any connected drive as a folder tree and tick whole
+  folders or individual files, then copy them into a folder on another drive. A
+  file ticked on its own lands straight in the chosen folder; a folder you tick
+  is recreated at the destination with its contents inside. The button is in
+  the header for anything you offload from — a card, a stick, a recorder — and
+  beside the **Contents** and **History** tabs for fixed drives (it is in the
+  right-click menu too). Nothing is removed from the source, files already at
+  the destination are skipped rather than overwritten, and every copy's size is
+  checked.
+- **New Project Folder** — creates the standard project folder layout on the drive
   (`01_Project Files` with Davinci Resolve / Premiere / After Effects,
   `02_Footage`, `03_Graphics`, `04_Music`, `05_Docs`, `06_Exports`). Asks for a
   name and a location, then opens the new folder. It never merges into or
@@ -95,7 +96,7 @@ it's plain folders and text files, so nothing is locked inside the app.
 
 - **Right-click a drive** for Eject, Move to Folder, Move Up / Move Down, and
   Remove from Index.
-- **`+ Folder`** in the header creates a folder to group drives into; folders
+- **`+ Index Folder`** in the header creates a folder to group drives into; folders
   appear as labelled sections in the sidebar.
 - **Right-click a folder heading** to rename it, move it up or down, or delete
   it (its drives return to the main list — nothing on any real drive is ever
@@ -103,6 +104,18 @@ it's plain folders and text files, so nothing is locked inside the app.
 
 Your arrangement is saved in `.drive-organization.json` inside the index
 folder, so it survives restarts.
+
+## Staying up to date
+
+The app checks GitHub for a new version once a day and only speaks up when
+there is one. To check on the spot, click the **version button** (for example
+`v1.7`) in the top-right corner of the window.
+
+Choosing to update downloads the new package, closes the app, copies the new
+files over the installed folder and opens it again. Your index and the
+background helper's scheduled task are left alone. If the copy fails for any
+reason the old version stays exactly where it was and the downloaded files are
+shown in Explorer instead.
 
 ## "Last used by"
 

@@ -81,8 +81,16 @@ final class CopyJob: ObservableObject {
 
 struct CopyFilesSheet: View {
     let volumeName: String
-    let files: [SourceFile]
+    /// The volume being copied from. Walked in the background when its file
+    /// list is not already in hand, so a big archive drive cannot freeze the
+    /// window while it is read.
+    let source: URL?
+    /// Cards have their list gathered already; drives are read on demand.
+    let preloaded: [SourceFile]?
     let suggestedDestination: URL?
+
+    @State private var files: [SourceFile] = []
+    @State private var isReading = false
 
     @EnvironmentObject var store: IndexStore
     @Environment(\.dismiss) private var dismiss
@@ -127,12 +135,24 @@ struct CopyFilesSheet: View {
         .padding(18)
         .frame(width: 620, height: 540)
         .background(Pip.bgRaised)
-        .onAppear {
-            if destination == nil { destination = suggestedDestination }
-            if nodes.isEmpty {
-                nodes = CopyPlan.tree(from: files, rootPath: volumeName)
-            }
+        .task { await load() }
+    }
+
+    /// A card's file list is already cached; anything else gets walked on a
+    /// background task so the window stays responsive meanwhile.
+    private func load() async {
+        if destination == nil { destination = suggestedDestination }
+        guard files.isEmpty else { return }
+        if let preloaded {
+            files = preloaded
+        } else if let source {
+            isReading = true
+            files = await Task.detached(priority: .userInitiated) {
+                CardVolumes.files(at: source)
+            }.value
+            isReading = false
         }
+        nodes = CopyPlan.tree(from: files, rootPath: volumeName)
     }
 
     // MARK: Choosing
@@ -153,7 +173,10 @@ struct CopyFilesSheet: View {
                     .buttonStyle(PipButtonStyle())
             }
 
-            if files.isEmpty {
+            if isReading {
+                PipEmpty(title: "Reading \(volumeName)…",
+                         message: "Looking through the drive for files and folders you can copy.")
+            } else if files.isEmpty {
                 PipEmpty(title: "Nothing to copy",
                          message: "No readable files were found on \(volumeName).")
             } else if filter.trimmingCharacters(in: .whitespaces).isEmpty {

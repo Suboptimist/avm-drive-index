@@ -27,7 +27,8 @@ struct DriveDetailView: View {
         }
         .sheet(isPresented: $showingCopy) {
             CopyFilesSheet(volumeName: drive.indexFolderName,
-                           files: store.sourceFiles(for: drive),
+                           source: drive.volumeURL,
+                           preloaded: store.cachedSourceFiles(for: drive),
                            suggestedDestination: firstOtherDrive)
                 .environmentObject(store)
         }
@@ -77,7 +78,7 @@ struct DriveDetailView: View {
                                 .help("Copy chosen files from here onto another drive")
                         }
                         if !drive.isCard {
-                            Button("New Project") { showingNewProject = true }
+                            Button("New Project Folder") { showingNewProject = true }
                                 .buttonStyle(PipButtonStyle())
                                 .help("Create the standard project folder structure on this drive")
                         }
@@ -174,6 +175,21 @@ struct DriveDetailView: View {
             tabButton("Contents", .folders)
             if !drive.isCard {
                 tabButton("History (\(drive.history.count))", .history)
+            }
+            // Copying off a plain drive belongs next to the contents you are
+            // browsing, not up in the header — that is the job you came to do
+            // second. Removable media keeps its Copy button up top instead,
+            // where offloading is the whole reason you plugged the thing in.
+            if drive.isConnected && !drive.isRemovableMedia {
+                // A rule keeps it from reading as a third tab — the tabs and
+                // this button share a style, and the active tab is also green.
+                Rectangle()
+                    .fill(Pip.faint)
+                    .frame(width: 1, height: 16)
+                    .padding(.horizontal, 4)
+                Button("Copy Files…") { showingCopy = true }
+                    .buttonStyle(PipButtonStyle())
+                    .help("Copy chosen files and folders from this drive onto another drive")
             }
             Spacer()
         }

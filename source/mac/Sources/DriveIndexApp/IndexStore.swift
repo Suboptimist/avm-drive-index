@@ -202,11 +202,10 @@ final class IndexStore: ObservableObject {
         for key in cardCache.keys where !mounted.contains(key) { cardCache.removeValue(forKey: key) }
     }
 
-    /// The files on a card, for the copy sheet.
-    func sourceFiles(for record: DriveRecord) -> [SourceFile] {
-        if let cached = cardCache[record.id] { return cached.files }
-        guard let volume = record.volumeURL else { return [] }
-        return CardVolumes.files(at: volume)
+    /// The files on a card, already gathered when it was listed. Nil for a
+    /// drive — the copy sheet walks those itself, off the main thread.
+    func cachedSourceFiles(for record: DriveRecord) -> [SourceFile]? {
+        cardCache[record.id]?.files
     }
 
     /// Any record the sidebar can select, drive or card.

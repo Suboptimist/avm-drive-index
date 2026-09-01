@@ -15,6 +15,17 @@ Add-Type -AssemblyName Microsoft.VisualBasic
 
 . (Join-Path $PSScriptRoot 'Common.ps1')
 
+# Updating is a convenience, never a reason the app cannot open. If either file
+# fails to load, the version button hides itself and everything else carries on.
+$script:UpdatesAvailable = $false
+try {
+    . (Join-Path $PSScriptRoot 'UpdateConfig.ps1')
+    . (Join-Path $PSScriptRoot 'Update.ps1')
+    $script:UpdatesAvailable = $true
+} catch {
+    $script:AppVersion = 'unknown'
+}
+
 $ErrorActionPreference = 'Continue'
 $script:TaskName = 'AVM Drive Indexer'
 $script:ToolsRoot = Split-Path $PSScriptRoot -Parent
@@ -110,9 +121,12 @@ $xamlText = @'
                          SelectionBrush="#4DE680"/>
               </Grid>
             </Border>
-            <Button Name="NewFolderButton" Content="+ Folder" Style="{StaticResource PipButton}"
+            <Button Name="NewFolderButton" Content="+ Index Folder" Style="{StaticResource PipButton}"
                     Margin="0,0,8,0"/>
-            <Button Name="RescanButton" Content="Rescan" Style="{StaticResource PipButton}"/>
+            <Button Name="RescanButton" Content="Rescan" Style="{StaticResource PipButton}"
+                    Margin="0,0,8,0"/>
+            <Button Name="VersionButton" Content="v0.0" Style="{StaticResource PipButton}"
+                    ToolTip="Check for updates"/>
           </StackPanel>
         </Grid>
       </Border>
@@ -178,7 +192,7 @@ $xamlText = @'
                 <Button Name="CopyFilesButton" Content="Copy Files..."
                         Style="{StaticResource PipButton}" Margin="0,0,8,0"
                         ToolTip="Copy chosen files from here onto another drive"/>
-                <Button Name="NewProjectButton" Content="New Project"
+                <Button Name="NewProjectButton" Content="New Project Folder"
                         Style="{StaticResource PipButton}" Margin="0,0,8,0"
                         ToolTip="Create the standard project folder structure on this drive"/>
                 <Button Name="EjectButton" Content="Eject" Style="{StaticResource PipButton}"/>
@@ -213,7 +227,11 @@ $xamlText = @'
             <StackPanel Grid.Row="3" Orientation="Horizontal" Margin="16,9,16,9">
               <Button Name="TabContents" Content="Contents" Style="{StaticResource TabButton}"
                       Margin="0,0,8,0"/>
-              <Button Name="TabHistory" Content="History" Style="{StaticResource TabButton}"/>
+              <Button Name="TabHistory" Content="History" Style="{StaticResource TabButton}"
+                      Margin="0,0,8,0"/>
+              <Button Name="CopyTabButton" Content="Copy Files..."
+                      Style="{StaticResource PipButton}" Visibility="Collapsed"
+                      ToolTip="Copy chosen files and folders from this drive onto another drive"/>
             </StackPanel>
 
             <Grid Grid.Row="4">
@@ -303,12 +321,12 @@ try {
 }
 
 foreach ($name in @('SidebarPanel', 'SearchInput', 'SearchPlaceholder', 'SearchShell',
-    'NewFolderButton', 'RescanButton', 'PlaceholderPane', 'PlaceholderTitle', 'PlaceholderBody',
+    'NewFolderButton', 'RescanButton', 'VersionButton', 'PlaceholderPane', 'PlaceholderTitle', 'PlaceholderBody',
     'DetailPane', 'DetailIndicator', 'DetailName', 'DetailDot', 'DetailStatus',
     'OpenDriveButton', 'CopyFilesButton', 'NewProjectButton', 'EjectButton', 'StatSize', 'StatFree',
     'StatFormat', 'StatLetter',
     'StatLastConnected', 'StatLastUser', 'UsagePanel', 'UsageBar', 'UsageFill', 'UsageLabel',
-    'TabContents', 'TabHistory', 'ContentsTree',
+    'TabContents', 'TabHistory', 'CopyTabButton', 'ContentsTree',
     'HistoryScroll', 'HistoryPanel', 'TabPlaceholder', 'ContentsNote', 'SearchPane',
     'SearchSummary', 'SearchResultsPanel', 'WatcherBanner', 'TurnOnButton')) {
     Set-Variable -Name $name -Scope Script -Value $window.FindName($name)
@@ -774,8 +792,16 @@ function Show-Detail {
         # Anything you offload from -- a card, a stick, a recorder -- gets Copy
         # up here. A fixed archive drive keeps it in the right-click menu, out
         # of the way of the job you usually came to do.
-        if ($record.IsRemovableMedia) { $script:CopyFilesButton.Visibility = 'Visible' }
-        else { $script:CopyFilesButton.Visibility = 'Collapsed' }
+        # Copying off a plain drive sits beside the tabs, next to the contents
+        # you are browsing. Removable media keeps its Copy button up in the
+        # header, where offloading is the reason you plugged the thing in.
+        if ($record.IsRemovableMedia) {
+            $script:CopyFilesButton.Visibility = 'Visible'
+            $script:CopyTabButton.Visibility = 'Collapsed'
+        } else {
+            $script:CopyFilesButton.Visibility = 'Collapsed'
+            $script:CopyTabButton.Visibility = 'Visible'
+        }
         if ($record.IsCard) { $script:NewProjectButton.Visibility = 'Collapsed' }
         else { $script:NewProjectButton.Visibility = 'Visible' }
     } else {
@@ -785,6 +811,7 @@ function Show-Detail {
         $script:DetailStatus.Foreground = $script:BrushDim
         $script:OpenDriveButton.Visibility = 'Collapsed'
         $script:CopyFilesButton.Visibility = 'Collapsed'
+        $script:CopyTabButton.Visibility = 'Collapsed'
         $script:NewProjectButton.Visibility = 'Collapsed'
         $script:EjectButton.Visibility = 'Collapsed'
     }
@@ -1322,7 +1349,11 @@ function Copy-FilesFromVolume([string]$Name) {
     if (-not $record -or -not $record.VolumePath) { return }
 
     try {
-        Show-CopyPicker $record
+        # Walking a whole drive takes a moment and the window is single-threaded,
+        # so say so with the cursor rather than looking frozen.
+        [System.Windows.Input.Mouse]::OverrideCursor = [System.Windows.Input.Cursors]::Wait
+        try { Show-CopyPicker $record }
+        finally { [System.Windows.Input.Mouse]::OverrideCursor = $null }
     } catch {
         # If the picker cannot be built for any reason, fall back to Windows'
         # own file dialog so copying still works.
@@ -1681,11 +1712,11 @@ function New-DriveProject {
     if (-not $record -or -not $record.VolumePath) { return }
 
     $name = [Microsoft.VisualBasic.Interaction]::InputBox(
-        'Name for the new project:', 'New Project', 'My Project')
+        'Name for the new project:', 'New Project Folder', 'My Project')
     if (-not $name) { return }
     $rejection = Get-ProjectNameRejection $name
     if ($rejection) {
-        [System.Windows.MessageBox]::Show($rejection, 'New Project') | Out-Null
+        [System.Windows.MessageBox]::Show($rejection, 'New Project Folder') | Out-Null
         return
     }
 
@@ -1702,7 +1733,7 @@ function New-DriveProject {
 
     $result = New-ProjectFolders $name $parent
     if (-not $result.Ok) {
-        [System.Windows.MessageBox]::Show($result.Error, 'New Project',
+        [System.Windows.MessageBox]::Show($result.Error, 'New Project Folder',
             [System.Windows.MessageBoxButton]::OK, [System.Windows.MessageBoxImage]::Warning) | Out-Null
         return
     }
@@ -1731,11 +1762,78 @@ function Update-WatcherBanner {
 
 # ---------------------------------------------------------------- wiring
 
+if ($script:UpdatesAvailable) {
+    $script:VersionButton.Content = "v$script:AppVersion"
+    $script:VersionButton.ToolTip = "Version $script:AppVersion -- click to check for updates"
+} else {
+    $script:VersionButton.Visibility = 'Collapsed'
+}
+
+function Invoke-UpdateCheck([bool]$Manual) {
+    if (-not $script:UpdatesAvailable -or $script:UpdateBusy) { return }
+    $script:UpdateBusy = $true
+    try {
+        # The window is single-threaded, so say the check is happening rather
+        # than looking frozen. The automatic check gets a shorter timeout so a
+        # slow network cannot hold up a launch.
+        [System.Windows.Input.Mouse]::OverrideCursor = [System.Windows.Input.Cursors]::Wait
+        try {
+            $timeout = 20; if (-not $Manual) { $timeout = 8 }
+            $found = Get-AvailableUpdate $timeout
+        } finally {
+            [System.Windows.Input.Mouse]::OverrideCursor = $null
+        }
+
+        if (-not $found) {
+            if ($Manual) {
+                [System.Windows.MessageBox]::Show(
+                    "AVM Drive Index $script:AppVersion is the newest version.",
+                    "You're Up to Date") | Out-Null
+            }
+            return
+        }
+
+        $answer = [System.Windows.MessageBox]::Show(
+            "You have $script:AppVersion. The update downloads and reopens the app automatically -- your drive index is untouched.`r`n`r`nUpdate now?",
+            "AVM Drive Index $($found.Version) Is Available",
+            [System.Windows.MessageBoxButton]::YesNo)
+        if ($answer -ne [System.Windows.MessageBoxResult]::Yes) { return }
+
+        [System.Windows.Input.Mouse]::OverrideCursor = [System.Windows.Input.Cursors]::Wait
+        try {
+            $problem = Install-AppUpdate $found $script:ToolsRoot
+        } finally {
+            [System.Windows.Input.Mouse]::OverrideCursor = $null
+        }
+        if ($problem) {
+            [System.Windows.MessageBox]::Show($problem, 'Update Failed') | Out-Null
+            return
+        }
+        # The swap script is waiting for this process to end.
+        $window.Close()
+    } finally {
+        $script:UpdateBusy = $false
+    }
+}
+
 $script:RescanButton.add_Click({ Invoke-Rescan })
+
+$script:VersionButton.add_Click({ Invoke-UpdateCheck $true })
+
+# Automatic check shortly after the window is up, at most once a day.
+$script:UpdateTimer = New-Object System.Windows.Threading.DispatcherTimer
+$script:UpdateTimer.Interval = [TimeSpan]::FromSeconds(5)
+$script:UpdateTimer.add_Tick({
+    $script:UpdateTimer.Stop()
+    if ($script:UpdatesAvailable -and (Get-UpdateCheckDue)) { Invoke-UpdateCheck $false }
+})
+if ($script:UpdatesAvailable) { $script:UpdateTimer.Start() }
 
 $script:NewFolderButton.add_Click({ New-DriveFolder $null })
 
 $script:CopyFilesButton.add_Click({ Copy-FilesFromVolume $null })
+
+$script:CopyTabButton.add_Click({ Copy-FilesFromVolume $null })
 
 $script:NewProjectButton.add_Click({ New-DriveProject })
 

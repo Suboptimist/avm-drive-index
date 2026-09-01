@@ -3,6 +3,7 @@ import AppKit
 
 struct ContentView: View {
     @EnvironmentObject var store: IndexStore
+    @EnvironmentObject var updates: UpdateChecker
     @State private var selection: String?
     @State private var searchText = ""
     @FocusState private var searchFocused: Bool
@@ -50,9 +51,23 @@ struct ContentView: View {
         }
         .sheet(item: $copyTarget) { record in
             CopyFilesSheet(volumeName: record.indexFolderName,
-                           files: store.sourceFiles(for: record),
+                           source: record.volumeURL,
+                           preloaded: store.cachedSourceFiles(for: record),
                            suggestedDestination: destinationSuggestion(excluding: record))
                 .environmentObject(store)
+        }
+        .alert(updates.prompt?.title ?? "", isPresented: Binding(
+            get: { updates.prompt != nil },
+            set: { if !$0 { updates.prompt = nil } }
+        ), presenting: updates.prompt) { prompt in
+            if prompt.kind == .updateAvailable {
+                Button("Update Now") { updates.installUpdate() }
+                Button("Later", role: .cancel) { }
+            } else {
+                Button("OK", role: .cancel) { }
+            }
+        } message: { prompt in
+            Text(prompt.message)
         }
         .modifier(DialogsModifier(
             selection: $selection,
@@ -76,7 +91,7 @@ struct ContentView: View {
                 moveAfterCreate = nil
                 showNewFolder = true
             } label: {
-                Text("+ Folder")
+                Text("+ Index Folder")
             }
             .buttonStyle(PipButtonStyle())
             Button {
@@ -380,7 +395,7 @@ private struct DialogsModifier: ViewModifier {
 
     func body(content: Content) -> some View {
         content
-            .alert("New Folder", isPresented: $showNewFolder) {
+            .alert("New Index Folder", isPresented: $showNewFolder) {
                 TextField("Folder name", text: $newFolderName)
                 Button("Create") {
                     let name = newFolderName.trimmingCharacters(in: .whitespaces)

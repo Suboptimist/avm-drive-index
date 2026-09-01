@@ -59,28 +59,37 @@ inside them — anything you add there gets cleaned away on the next
 connection. Notes are safe as files directly in the drive's folder
 (files are never deleted, only folders are rebuilt).
 
-## Copying off a card
+## Copying between drives
 
 Insert a memory card and it appears under **Cards** in the sidebar — not
 catalogued (cards get reformatted too often to be worth a permanent record),
 just there for as long as it is plugged in. Its folders and files are read
 fresh each time.
 
-**Copy Files…** sits at the top for anything you offload from — a memory card,
-a USB stick, a field recorder, a mic — that is, any volume the system reports
-as *removable media*. A fixed archive drive keeps it in the right-click menu
-instead, out of the way of the job you usually came to do.
+**Copy Files…** works from any connected drive, not just cards — pick things
+off one drive and put them on another. Where the button sits depends on what
+you plugged in:
 
-You browse the card as a folder tree: open a folder to tick individual files,
+- **Anything you offload from** — a memory card, a USB stick, a field recorder,
+  a mic; that is, any volume the system reports as *removable media* — gets it
+  in the header, next to Open Drive. Emptying the thing is why you plugged it
+  in.
+- **A fixed drive** gets it beside the **Contents** and **History** tabs, where
+  it belongs to the contents you are looking at rather than crowding the
+  header. It is also in the drive's right-click menu.
+
+You browse the drive as a folder tree: open a folder to tick individual files,
 or tick the folder itself to take everything in it. What you tick decides where
 things land — **a file ticked on its own goes straight into the folder you
 chose, and a folder you tick is recreated at the destination with its contents
-inside**. So ticking `100MSDCF` puts a `100MSDCF` folder in your project, while
-ticking three clips inside it drops just those three clips in.
+inside**. So ticking `Spring Campaign` puts a `Spring Campaign` folder at the
+destination, while ticking one clip inside `Exports` drops just that clip in.
+
+A big drive takes a moment to read; the window stays usable while it does.
 
 It is deliberately careful:
 
-- nothing is ever removed from the card,
+- nothing is ever removed from the source,
 - a file already at the destination is skipped and listed, never overwritten,
 - every copy's size is checked, and a short copy is deleted rather than left
   looking valid.
@@ -88,9 +97,9 @@ It is deliberately careful:
 Point it at a project's `02_Footage` and that is exactly where the clips end
 up.
 
-## New Project
+## New Project Folder
 
-With a drive connected, **New Project** (next to Open Drive) creates the
+With a drive connected, **New Project Folder** (next to Open Drive) creates the
 standard project layout on it:
 
 ```
@@ -110,6 +119,16 @@ Give it a name, pick where it goes (the drive's top level to start with), and
 it makes the folders and opens the result in Finder. An existing folder of the
 same name is never merged into or overwritten — you get told the name is taken
 instead. This replaces the old "AVM Folder Structure" applet.
+
+## Staying up to date
+
+The app checks GitHub for a new version once a day and only says anything when
+there actually is one — then it downloads it, swaps itself out and reopens,
+leaving your index untouched. To check on the spot, use **AVM Drive Index →
+Check for Updates…** in the menu bar.
+
+Nothing secret is involved: the repository is public, so the check is an
+ordinary unauthenticated request and no key ships inside the app.
 
 ## Turning it on (once)
 

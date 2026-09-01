@@ -215,6 +215,13 @@ An update only reaches you if the copy you are running already knows how to
 look for one, which starts with version 1.7. Anything older has to be replaced
 once by hand from the downloads above.
 
+One thing to expect on a Mac: replacing the app gives it a fresh signature, so
+macOS may forget that it was allowed to read external drives. If a drive's
+folders come up empty after an update, connect it, press **Rescan**, and
+approve the prompt — or switch **AVM Drive Index** back on under System
+Settings → Privacy & Security → Files and Folders (Removable Volumes). Windows
+has no equivalent step.
+
 ## Where your catalogue lives
 
 Nothing is hidden inside the app — it's plain folders and text files:

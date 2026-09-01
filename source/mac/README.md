@@ -130,6 +130,13 @@ Check for Updates…** in the menu bar.
 Nothing secret is involved: the repository is public, so the check is an
 ordinary unauthenticated request and no key ships inside the app.
 
+One thing to expect on a Mac: replacing the app gives it a fresh signature, so
+macOS may forget that it was allowed to read external drives. If a drive's
+folders come up empty after an update, connect it, press **Rescan**, and
+approve the prompt — or switch **AVM Drive Index** back on under System
+Settings → Privacy & Security → Files and Folders (Removable Volumes). Nothing
+else about the drive is lost; only the folder and file listing needs rebuilding.
+
 ## Turning it on (once)
 
 Double-click **`Install Drive Indexer.command`**.
